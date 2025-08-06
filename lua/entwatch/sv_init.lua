@@ -119,10 +119,6 @@ function EntWatch.OnWeaponPickup(owner, weapon)
 end
 
 function EntWatch.OnWeaponDropped(owner, weapon)
-    if isstring(owner.m_DefaultName) then
-        owner:SetName(owner.m_DefaultName)
-    end
-
     for id, ent in ipairs(EntWatch.CachedEntities) do
         if ent == weapon then
             table.remove(EntWatch.CachedEntities, id)
@@ -130,10 +126,18 @@ function EntWatch.OnWeaponDropped(owner, weapon)
         end
     end
 
-    --[[net.Start("entwatch")
-    net.WriteUInt(3, 8)
-    net.WriteEntity(weapon)
-    net.Broadcast()--]]
+    if owner and owner:IsValid() then
+        if isstring(owner.m_DefaultName) then
+            owner:SetName(owner.m_DefaultName)
+        end
+
+        if !owner:Alive() then
+            net.Start("entwatch")
+            net.WriteUInt(1, 8)
+            net.WriteUInt(1, 8)
+            net.Send(owner)
+        end
+    end
 
     return true
 end
@@ -446,16 +450,9 @@ hook.Add("WeaponEquip", "EntWatch.WeaponEquip", function(weapon, owner)
 end)
 
 hook.Add("PlayerDroppedWeapon", "EntWatch.OnDroppedWeapon", function(owner, weapon)
-    if owner:Alive() and weapon:IsMateria() then
+    if weapon:IsMateria() then
         EntWatch.OnWeaponDropped(owner, weapon)
     end
-end)
-
-hook.Add("PlayerChangedTeam", "EntWatch.PlayerChangedTeam", function(ply, old_team, new_team)
-    net.Start("entwatch")
-    net.WriteUInt(1, 8)
-    net.WriteUInt(1, 8)
-    net.Send(ply)
 end)
 
 net.Receive("entwatch", function(len, ply)
