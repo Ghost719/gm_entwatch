@@ -6,15 +6,6 @@ if file.Exists("entwatch/maps/" .. game.GetMap() .. ".lua", "LUA") then
     EntWatch.MapConfig = include("entwatch/maps/" .. game.GetMap() .. ".lua")
 end
 
-local button_classes = {
-    ["func_button"] = true,
-    ["func_rot_button"] = true,
-    ["func_physbox_multiplayer"] = true,
-    ["func_door"] = true,
-    ["func_door_rotating"] = true,
-    ["game_ui"] = true,
-}
-
 function EntWatch.GetConfig(key, value)
     for _, config in ipairs(EntWatch.MapConfig) do
         if config[key] == value then
@@ -309,7 +300,7 @@ hook.Add("EntityKeyValue", "EntWatch.EntityKeyValue", function(ent, key, value)
         EntWatch.OnWeaponInit(ent)
     end
 
-    if button_classes[ent:GetClass()] and key == "hammerid" then
+    if ENTWATCH_BUTTON_CLASSNAMES[ent:GetClass()] and key == "hammerid" then
         ent:SetHammerID(tonumber(value) or 0)
         EntWatch.OnButtonInit(ent)
     end
@@ -345,11 +336,11 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
     local parent = ent:GetMateriaParent()
 
     -- checking the "func_button" entity and the parent (weapon) entity
-    if button_classes[ent:GetClass()] and parent and parent:IsValid() then
+    if ENTWATCH_BUTTON_CLASSNAMES[ent:GetClass()] and parent and parent:IsValid() then
         local owner = parent:GetOwner()
 
         if input == "Use" then
-            if !IsValid(activator) or owner ~= activator or !ent:IsOpen() then return end
+            if !IsValid(activator) or owner ~= activator or ent:IsPressed() then return end
 
             if CurTime() < parent:GetMateriaCooldown() then
                 -- we're not ready yet

@@ -12,10 +12,9 @@ function entmeta:IsLocked()
     return self:GetInternalVariable("m_bLocked")
 end
 
-function entmeta:IsOpen()
-    -- TODO: this is correct for the func_button, check the other button entities
-    if self:GetClass() == "func_button" then
-        return self:GetInternalVariable("m_toggle_state") == 1
+function entmeta:IsPressed()
+    if ENTWATCH_BUTTON_CLASSNAMES[self:GetClass()] then
+        return self:GetInternalVariable("m_toggle_state") == 0
     else
         return false
     end

@@ -35,3 +35,13 @@ ENTWATCH_CSSWEAPONS = {
     ["weapon_p90"] = true,
     ["weapon_m249"] = true
 }
+
+ENTWATCH_BUTTON_CLASSNAMES = {
+    ["func_button"] = true,
+    ["func_rot_button"] = true,
+    ["func_door"] = true,
+    ["func_door_rotating"] = true,
+
+    --["func_physbox_multiplayer"] = true,
+    --["game_ui"] = true,
+}
