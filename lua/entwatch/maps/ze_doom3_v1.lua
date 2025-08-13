@@ -68,8 +68,7 @@ return {
     {
         ["name"] = "BFG",
         ["shortname"] = "BFG",
-        ["buttonclass"] = "grenades1tru",
-        ["filtername"] = "nagoi2",
+        ["filtername"] = "grenades1tru",
         ["hammerid"] = 1520691,
         ["buttonid"] = 1520408,
         -- крч, видимо это баганая залупа вообще или только в gmod, а значит маппер даун
