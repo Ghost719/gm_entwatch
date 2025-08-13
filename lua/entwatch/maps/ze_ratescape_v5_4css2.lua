@@ -35,7 +35,9 @@ return {
         ["filtername"] = "M200_Owner",
         ["hammerid"] = 888923,
         ["buttonid"] = 888853,
-        ["mode"] = ENTWATCH_MODE_COOLDOWNS,
+        ["energyname"] = "Item_M200_counter",
+        ["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        ["hitmax"] = 5, -- max uses
         ["cooldown"] = 8,
         ["pt_spawner"] = "Weapon_M200_Temp",
     },
