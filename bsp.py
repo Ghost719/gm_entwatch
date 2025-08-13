@@ -41,6 +41,11 @@ CSS_WEAPONS = [
     "weapon_m249",
 ]
 
+# FIXME: ugly fix
+BLACKLIST_MATH_COUNTERS = [
+    "pirate_counter", # ze_doom3_v1
+]
+
 def tryint(x, fallback=False):
     try:
         return int(x)
@@ -278,7 +283,7 @@ class ParseBSP:
 
         logger.info("%s: found \"%s\" with hammerid = %i and targetname = \"%s\"", config["name"], config["buttonclass"], config["buttonid"], config["buttonname"])
 
-        if math_counter:
+        if math_counter and math_counter.targetname not in BLACKLIST_MATH_COUNTERS:
             config["energyid"] = math_counter.hammerid
             config["energyname"] = math_counter.targetname
 
@@ -298,7 +303,6 @@ class ParseBSP:
                             lock = True
                         if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
                             unlock = True
-                            config["maxuses"] = 1
                             config["cooldown"] = tryint(params.delay)
                             logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
                         if params.targetinput == "Kill":
@@ -306,7 +310,6 @@ class ParseBSP:
 
                     if params.targetname == config.get("triggername"):
                         if params.targetinput == "Enable" and config.get("cooldown", 0) == 0:
-                            config["maxuses"] = 1
                             config["cooldown"] = tryint(params.delay)
                             logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
 
@@ -315,7 +318,7 @@ class ParseBSP:
                 config["mode"] = 3
                 return config
 
-        if math_counter:
+        if math_counter and math_counter.targetname not in BLACKLIST_MATH_COUNTERS:
             if math_counter.raw.get("startvalue") is not None:
                 config["currentvalue"] = tryint(math_counter.raw.get("startvalue"), fallback=True)
             if math_counter.raw.get("min") is not None:
@@ -348,7 +351,6 @@ class ParseBSP:
 
         logger.info("%s: mode = ENTWATCH_MODE_COOLDOWNS", config["name"])
         config["mode"] = 2
-        config["maxuses"] = 1
         return config
 
 def main(source_path):
@@ -409,6 +411,9 @@ def fix_config(config):
         save_remove(cfg, "energyid")
         save_remove(cfg, "triggerid")
         save_remove(cfg, "triggername")
+
+        if cfg.get("cooldown", 0) < 2:
+            save_remove(cfg, "cooldown")
 
         if cfg["mode"] == 1:
             cfg["mode"] = "ENTWATCH_MODE_SPAM_PROTECTION_ONLY"
