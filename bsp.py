@@ -4,11 +4,14 @@ from pprint import pprint
 
 import argparse
 import pyparsing as pp
+import logging
 import re
 
-entity_list_by_names = {}
-entity_list_by_classes = {}
-entity_list_by_parentname = {}
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(lineno)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 CSS_WEAPONS = [
     "weapon_knife",
@@ -38,261 +41,423 @@ CSS_WEAPONS = [
     "weapon_m249",
 ]
 
-def parse_event_params(line):
-    targetname, targetinput, parameter, delay, refire = re.split(r"\s*,\s*", line)
-    return targetname, targetinput, parameter, delay, refire
+def tryint(x, fallback=False):
+    try:
+        return int(x)
+    except ValueError:
+        pass
 
-def find_point_template_by_weapon(entlist, weapon):
-    for entity in entlist:
-        if entity.get("__Templates") is None:
-            continue
-        if weapon.get("targetname") in entity.get("__Templates"):
-            return entity
+    if fallback:
+        return x
+    else:
+        return 0
 
-def find_all_entities_by_point_template(point_template):
-    func_button, filter_name, logic_entity, trigger_hurt, math_counter = None, None, None, None, None
+class EventParams:
+    def __init__(self, line):
+        self.targetname, self.targetinput, self.parameter, self.delay, self.refire = re.split(r"\s*,\s*", line)
 
-    for entname in point_template.get("__Templates", []):
-        entity = entity_list_by_names.get(entname)
-        if entity is None:
-            continue
+    def __repr__(self):
+        return f"EventParams(targetname=\"{self.targetname}\", targetinput=\"{self.targetinput}\", parameter=\"{self.parameter}\", delay=\"{self.delay}\", refire=\"{self.refire}\")"
 
-        classname = entity.get("classname")
-        if classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
-            func_button = entity
-            continue
-        if classname == "filter_activator_name":
-            filter_name = entity
-            continue
-        if classname == "logic_relay":
-            logic_entity = entity
-            continue
-        if classname == "trigger_hurt":
-            trigger_hurt = entity
-            continue
-        if classname == "math_counter":
-            math_counter = entity
-            continue
+class Entity:
+    def __init__(self, entity_info):
+        self.hammerid = 0
+        self.classname = "None"
+        self.parentname = "None"
+        self.targetname = "None"
+        self.filtername = "None"
+        self.templates = []
+        self.events = {}
+        self.raw = {}
 
-    return func_button, filter_name, logic_entity, trigger_hurt, math_counter
+        for vals in entity_info:
+            x, y = vals[0], vals[1]
+            if x == "id" or x == "hammerid":
+                self.hammerid = tryint(y)
+            elif x == "classname":
+                self.classname = y
+            elif x == "parentname":
+                self.parentname = y
+            elif x == "targetname":
+                self.targetname = y
+            elif x == "filtername":
+                self.filtername = y
+            elif x[:8] == "Template":
+                self.templates.append(y)
+            elif x[:2] == "On":
+                self.events.setdefault(x, [])
+                self.events[x].append(EventParams(y))
+            else:
+                self.raw.setdefault(x, y)
 
-def find_all_entities_by_parentname(parentname):
-    func_button, filter_name, logic_entity, trigger_hurt, math_counter = None, None, None, None, None
+    def __repr__(self):
+        return f"Entity(hammerid={self.hammerid}, classname=\"{self.classname}\", parentname=\"{self.parentname}\", targetname=\"{self.targetname}\", filtername=\"{self.filtername}\", templates={self.templates}, events={self.events}, raw={self.raw})"
 
-    for entity in entity_list_by_parentname.get(parentname, []):
-        classname = entity.get("classname")
-        if classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
-            func_button = entity
-            continue
-        if classname == "filter_activator_name":
-            filter_name = entity
-            continue
-        if classname[:6] == "logic_":
-            logic_entity = entity
-            continue
-        if classname == "trigger_hurt":
-            trigger_hurt = entity
-            continue
-        if classname == "math_counter":
-            math_counter = entity
-            continue
+    def get_events(self, name):
+        return self.events.get(name, [])
 
-    if func_button is None:
-        return func_button, filter_name, logic_entity, trigger_hurt, math_counter
+class ParseBSP:
+    def __init__(self, source_path):
+        self.bsp = Bsp(source_path)
+        self.lump_header = self.bsp._get_lump_header(LUMP_ENTITIES)
 
-    if filter_name is None:
-        for x in func_button.get("OnPressed", []):
-            targetname, targetinput, parameter, delay, refire = parse_event_params(x)
-            entity = entity_list_by_names.get(targetname)
-            if entity is not None and entity.get("classname") == "filter_activator_name":
+        with open(self.bsp.source_path, "rb") as file:
+            file.seek(self.lump_header.fileofs)
+            self.lump_raw = file.read(self.lump_header.filelen)
+
+        self.entity_list = []
+        self.entity_list_by_names = {}
+        self.entity_list_by_classes = {}
+        self.entity_list_by_parentname = {}
+
+    def parse(self):
+        # avoid decoding errors
+        lump_raw = self.lump_raw.decode("ascii", errors="ignore")
+        lump_raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", lump_raw)
+
+        # parse all entities
+        entity_property_encoding = pp.Group(pp.QuotedString('"', multiline=True) * 2)
+        entity_encoding = pp.nested_expr("{", "}", entity_property_encoding, None)
+        lump_0_encoding = pp.ZeroOrMore(entity_encoding)
+        entity_list_raw = lump_0_encoding.parse_string(lump_raw, parse_all=True)
+
+        # convert raw lists to dict
+        for entity_raw in entity_list_raw:
+            self.entity_list.append(Entity(entity_raw))
+
+        # sort all by name and classname
+        for entity in self.entity_list:
+            if entity.targetname is not None:
+                self.entity_list_by_names.setdefault(entity.targetname, entity)
+            if entity.classname is not None:
+                self.entity_list_by_classes.setdefault(entity.classname, [])
+                self.entity_list_by_classes[entity.classname].append(entity)
+            if entity.parentname is not None:
+                self.entity_list_by_parentname.setdefault(entity.parentname, [])
+                self.entity_list_by_parentname[entity.parentname].append(entity)
+
+    def get_entity_by_targetname(self, targetname):
+        return self.entity_list_by_names.get(targetname)
+
+    def get_entities_by_classname(self, classname):
+        return self.entity_list_by_classes.get(classname, [])
+    
+    def get_entities_by_parentname(self, parentname):
+        return self.entity_list_by_parentname.get(parentname, [])
+
+    def find_point_template_by_weaponname(self, weaponname):
+        for point_template in self.get_entities_by_classname("point_template"):
+            if weaponname in point_template.templates:
+                return point_template
+
+    def find_filter_name_by_func_button(self, func_button):
+        filter_name = None
+        for params in func_button.get_events("OnPressed"):
+            entity = self.get_entity_by_targetname(params.targetname)
+            if entity is not None and entity.classname == "filter_activator_name":
                 filter_name = entity
                 break
+        return filter_name
 
-    if filter_name is not None and logic_entity is None:
-        for x in filter_name.get("OnPass", []):
-            targetname, targetinput, parameter, delay, refire = parse_event_params(x)
-            entity = entity_list_by_names.get(targetname)
-            if entity is not None and entity.get("classname")[:6] == "logic_":
+    def find_entities_by_filter_name(self, filter_name):
+        logic_entity, trigger_entity, math_counter = None, None, None
+
+        for params in filter_name.get_events("OnPass"):
+            entity = self.get_entity_by_targetname(params.targetname)
+            if not entity:
+                continue
+
+            if not logic_entity and entity.classname[:6] == "logic_":
                 logic_entity = entity
+                continue
+            if not trigger_entity and entity.classname[:8] == "trigger_":
+                trigger_entity = entity
+                continue
+            if not math_counter and entity.classname == "math_counter":
+                math_counter = entity
+                continue
+
+        return logic_entity, trigger_entity, math_counter
+
+    def find_entities_by_logic_entity(self, logic_entity):
+        trigger_entity, math_counter = None, None
+
+        events = logic_entity.get_events("OnTrigger")
+        if not events:
+            events = logic_entity.get_events("OnEqualTo")
+
+        for params in events:
+            entity = self.get_entity_by_targetname(params.targetname)
+            if not entity:
+                continue
+
+            if not trigger_entity and entity.classname[:8] == "trigger_":
+                trigger_entity = entity
+                continue
+            if not math_counter and entity.classname == "math_counter":
+                math_counter = entity
+                continue
+
+        return trigger_entity, math_counter
+
+    def find_all_by_point_template(self, point_template):
+        func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
+
+        for entname in point_template.templates:
+            entity = self.get_entity_by_targetname(entname)
+            if entity is None:
+                continue
+
+            if entity.classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
+                func_button = entity
+                continue
+            if entity.classname == "filter_activator_name":
+                filter_name = entity
+                continue
+            if entity.classname[:6] == "logic_":
+                logic_entity = entity
+                continue
+            if entity.classname[:8] == "trigger_":
+                trigger_entity = entity
+                continue
+            if entity.classname == "math_counter":
+                math_counter = entity
+                continue
+
+        if not filter_name and func_button:
+            filter_name = self.find_filter_name_by_func_button(func_button)
+
+        if filter_name and not logic_entity:
+            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
+
+        if logic_entity and not math_counter:
+            trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
+
+        return func_button, filter_name, logic_entity, trigger_entity, math_counter
+
+    def find_all_by_parentname(self, parentname):
+        func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
+
+        for entity in self.get_entities_by_parentname(parentname):
+            if entity.classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
+                func_button = entity
                 break
 
-    return func_button, filter_name, logic_entity, trigger_hurt, math_counter
+        if func_button is None:
+            return func_button, filter_name, logic_entity, trigger_entity, math_counter
 
-def get_config_raw(config, entity_list_by_names, func_button = None, filter_name = None, logic_entity = None, trigger_hurt = None, math_counter = None):
-    if func_button is not None:
-        config["buttonclass"] = func_button.get("classname")
-        config["buttonid"] = func_button.get("hammerid")
-        config["buttonname"] = func_button.get("targetname")
+        if not filter_name:
+            filter_name = self.find_filter_name_by_func_button(func_button)
 
-        print(f"INFO: {config['name']}: found {config['buttonclass']} with hammerid = {config['buttonid']} and targetname = {config['buttonname']}")
+        if filter_name:
+            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
 
-        for x in func_button.get("OnPlayerPickup", []):
-            targetname, targetinput, parameter, delay, refire = parse_event_params(x)
-            if targetname == "!activator" and targetinput == "AddOutput" and parameter[:11] == "targetname ":
-                config["filtername"] = parameter[11:]
-                print(f"INFO: {config['name']}: found filtername = {config['filtername']}")
+        if logic_entity:
+            trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
+
+        return func_button, filter_name, logic_entity, trigger_entity, math_counter
+
+    def get_config_raw(self, config, func_button=None, filter_name=None, logic_entity=None, trigger_entity=None, math_counter=None):
+        if not func_button:
+            logger.info("%s: mode = ENTWATCH_MODE_NOBUTTON", config["name"])
+            config["mode"] = 0
+            return config
+
+        for params in func_button.get_events("OnPlayerPickup"):
+            if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                config["filtername"] = params.parameter[11:]
+                logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
                 break
-    else:
-        print(f"ERROR: {config['name']}: button not found")
 
-    if filter_name is not None:
-        if len(config.get("filtername", "")) == 0 and filter_name.get("filtername") is not None:
-            config["filtername"] = filter_name.get("filtername")
-            print(f"INFO: {config['name']}: found filtername = {config['filtername']}")
-        elif len(config.get("filtername", "")) > 0 and filter_name.get("filtername") is not None and filter_name.get("filtername") != config["filtername"]:
-            config["filtername"] = filter_name.get("filtername")
-            print(f"WARN: {config['name']}: override filtername with {config['filtername']}")
+        if filter_name:
+            if not config.get("filtername"):
+                config["filtername"] = filter_name.filtername
+                logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
-        if math_counter is None:
-            for x in filter_name.get("OnPass", []):
-                targetname, targetinput, parameter, delay, refire = parse_event_params(x)
-                if targetinput in ["Enable", "Disable", "Add", "Subtract", "Divide", "Multiply", "SetValue", "SetValueNoFire", "SetHitMax", "SetHitMin"]:
-                    mc = entity_list_by_names.get(targetname)
-                    if mc is not None:
-                        print(f"INFO: {config['name']}: found math_counter in filter_activator_name")
-                        math_counter = mc
-    else:
-        print(f"ERROR: {config['name']}: filter_activator_name not found")
+        config["buttonclass"] = func_button.classname
+        config["buttonid"] = func_button.hammerid
+        config["buttonname"] = func_button.targetname
 
-    if trigger_hurt is not None:
-        config["triggerid"] = trigger_hurt.get("hammerid")
-        config["triggername"] = trigger_hurt.get("targetname")
-    else:
-        print(f"ERROR: {config['name']}: trigger_hurt not found")
+        logger.info("%s: found \"%s\" with hammerid = %i and targetname = \"%s\"", config["name"], config["buttonclass"], config["buttonid"], config["buttonname"])
 
-    if logic_entity is not None:
-        lockfound = False
-        unlockfound = False
+        if math_counter:
+            config["energyid"] = math_counter.hammerid
+            config["energyname"] = math_counter.targetname
 
-        if logic_entity.get("classname") == "logic_relay":
-            for x in logic_entity.get("OnTrigger", []):
-                targetname, targetinput, parameter, delay, refire = parse_event_params(x)
-                if targetname == config["buttonname"] and targetinput == "Lock":
-                    lockfound = True
-                if targetname == config["buttonname"] and targetinput == "Unlock":
-                    unlockfound = True
-                    if config.get("cooldown", 0) == 0:
-                        config["cooldown"] = int(delay)
-                        print(f"INFO: {config['name']}: found cooldown = {config['cooldown']}")
-                if math_counter is None and targetinput in ["Enable", "Disable", "Add", "Subtract", "Divide", "Multiply", "SetValue", "SetValueNoFire", "SetHitMax", "SetHitMin"]:
-                    mc = entity_list_by_names.get(targetname)
-                    if mc is not None:
-                        print(f"INFO: {config['name']}: found math_counter in logic_relay")
-                        math_counter = mc
-                if trigger_hurt is not None and targetname == config.get("triggername") and targetinput == "Enable":
-                    if config.get("cooldown", 0) == 0:
-                        config["cooldown"] = int(delay)
-                        print(f"INFO: {config['name']}: found cooldown = {config['cooldown']}")
+        if trigger_entity:
+            config["triggerid"] = trigger_entity.hammerid
+            config["triggername"] = trigger_entity.targetname
 
-        if lockfound and not unlockfound:
-            config["mode"] = 3
-            print(f"INFO: {config['name']}: mode = ENTWATCH_MODE_LIMITED_USES")
+        config["mode"] = 0
 
-        if config.get("mode", 0) == 0:
-            if math_counter is not None:
-                if math_counter.get("startvalue") is not None:
-                    config["currentvalue"] = math_counter.get("startvalue")
-                if math_counter.get("min") is not None:
-                    config["hitmin"] = math_counter.get("min")
-                if math_counter.get("max") is not None:
-                    config["hitmax"] = math_counter.get("max")
+        if filter_name or logic_entity:
+            lock, unlock, kill = False, False, False
 
-                if math_counter.get("OnHitMin") is not None:
-                    config["mode"] = 4
-                    print(f"INFO: {config['name']}: mode = ENTWATCH_MODE_COUNTER_FMIN_REACHED")
-                elif math_counter.get("OnHitMax") is not None:
-                    config["mode"] = 5
-                    print(f"INFO: {config['name']}: mode = ENTWATCH_MODE_COUNTER_FMAX_REACHED")
-                else:
-                    print(f"ERROR: {config['name']}: math_counter found, but mode is not valid")
+            for events in [filter_name and filter_name.get_events("OnPass") or [], logic_entity and logic_entity.get_events("OnTrigger") or []]:
+                for params in events:
+                    if params.targetname == config.get("buttonname"):
+                        if params.targetinput == "Lock":
+                            lock = True
+                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                            unlock = True
+                            config["maxuses"] = 1
+                            config["cooldown"] = tryint(params.delay)
+                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+                        if params.targetinput == "Kill":
+                            kill = True
+
+                    if params.targetname == config.get("triggername"):
+                        if params.targetinput == "Enable" and config.get("cooldown", 0) == 0:
+                            config["maxuses"] = 1
+                            config["cooldown"] = tryint(params.delay)
+                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+
+            if lock and not unlock or kill:
+                logger.info("%s: mode = ENTWATCH_MODE_LIMITED_USES", config["name"])
+                config["mode"] = 3
+                return config
+
+        if math_counter:
+            if math_counter.raw.get("startvalue") is not None:
+                config["currentvalue"] = tryint(math_counter.raw.get("startvalue"), fallback=True)
+            if math_counter.raw.get("min") is not None:
+                config["hitmin"] = tryint(math_counter.raw.get("min"), fallback=True)
+            if math_counter.raw.get("max") is not None:
+                config["hitmax"] = tryint(math_counter.raw.get("max"), fallback=True)
+
+            if len(math_counter.get_events("OnHitMin")) > 0:
+                logger.info("%s: mode = ENTWATCH_MODE_COUNTER_FMIN_REACHED", config["name"])
+                config["mode"] = 4
+
+                for params in math_counter.get_events("OnHitMin"):
+                    if params.targetname == config.get("buttonname"):
+                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                            config["cooldown"] = tryint(params.delay)
+                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+            elif len(math_counter.get_events("OnHitMax")) > 0:
+                logger.info("%s: mode = ENTWATCH_MODE_COUNTER_FMAX_REACHED", config["name"])
+                config["mode"] = 5
+
+                for params in math_counter.get_events("OnHitMax"):
+                    if params.targetname == config.get("buttonname"):
+                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                            config["cooldown"] = tryint(params.delay)
+                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
             else:
-                print(f"ERROR: {config['name']}: math_counter not found")
-                config["mode"] = 2
-    else:
-        print(f"ERROR: {config['name']}: logic_relay not found")
+                logger.error(f"%s: math_counter found, but mode is not valid", config["name"])
 
-    return config
+            return config
+
+        logger.info("%s: mode = ENTWATCH_MODE_COOLDOWNS", config["name"])
+        config["mode"] = 2
+        config["maxuses"] = 1
+        return config
 
 def main(source_path):
-    print(f"INFO: source_path = {source_path}")
-    bsp = Bsp(source_path)
-    lump_header = bsp._get_lump_header(LUMP_ENTITIES)
+    logger.debug("source_path = %s", source_path)
+    logger.info("parsing BSP file")
+    bsp = ParseBSP(source_path)
+    bsp.parse()
 
-    with open(bsp.source_path, "rb") as file:
-        file.seek(lump_header.fileofs)
-        lump_raw = file.read(lump_header.filelen)
-
-    # avoid decoding errors
-    print("INFO: parsing BSP")
-    lump_raw = lump_raw.decode("ascii", errors="ignore")
-    lump_raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", lump_raw)
-
-    # parse all entities
-    entity_property_encoding = pp.Group(pp.QuotedString('"', multiline=True) * 2)
-    entity_encoding = pp.nested_expr("{", "}", entity_property_encoding, None)
-    lump_0_encoding = pp.ZeroOrMore(entity_encoding)
-    entity_list_raw = lump_0_encoding.parse_string(lump_raw, parse_all=True)
-
-    # convert raw lists to dict
-    entity_list = []
-    for entity in entity_list_raw:
-        info = {}
-        for vals in entity:
-            x, y = vals[0], vals[1]
-            if x[:2] == "On":
-                info.setdefault(x, [])
-                info[x].append(y)
-            elif x[:8] == "Template":
-                info.setdefault("__Templates", [])
-                info["__Templates"].append(y)
-            else:
-                info.setdefault(x, y)
-        entity_list.append(info)
-
-    # sort all by name and classname
-    for entity in entity_list:
-        if entity.get("targetname") is not None:
-            entity_list_by_names.setdefault(entity.get("targetname"), entity)
-        if entity.get("classname") is not None:
-            entity_list_by_classes.setdefault(entity.get("classname"), [])
-            entity_list_by_classes[entity.get("classname")].append(entity)
-        if entity.get("parentname") is not None:
-            entity_list_by_parentname.setdefault(entity.get("parentname"), [])
-            entity_list_by_parentname[entity.get("parentname")].append(entity)
-
-    print("INFO: parsing done, now trying to get config for all weapons")
-
+    logger.info("parsing done, now trying to get config for all weapons")
     entwatch_config_list = []
 
     for weapon_class in CSS_WEAPONS:
-        weapon_list = entity_list_by_classes.get(weapon_class)
-        if weapon_list is None:
-            continue
-
-        for weapon in weapon_list:
+        for weapon in bsp.get_entities_by_classname(weapon_class):
             config = {}
-            config["name"] = weapon.get("targetname")
+            config["name"] = weapon.targetname
             config["shortname"] = config["name"]
-            config["hammerid"] = weapon.get("hammerid")
+            config["filtername"] = ""
+            config["hammerid"] = weapon.hammerid
 
-            print(f"INFO: {config['name']}: hammerid = {config['hammerid']}")
+            logger.info("%s: hammerid = %i", config["name"], config["hammerid"])
 
-            point_template = find_point_template_by_weapon(entity_list_by_classes.get("point_template", {}), weapon)
-            if point_template is None:
-                func_button, filter_name, logic_relay, trigger_hurt, math_counter = find_all_entities_by_parentname(config["name"])
+            point_template = bsp.find_point_template_by_weaponname(weapon.targetname)
+            if not point_template:
+                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_parentname(weapon.targetname)
             else:
-                func_button, filter_name, logic_relay, trigger_hurt, math_counter = find_all_entities_by_point_template(point_template)
+                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template)
 
-            config = get_config_raw(config, entity_list_by_names, func_button = func_button, filter_name = filter_name, logic_relay = logic_relay, trigger_hurt = trigger_hurt, math_counter = math_counter)
+            logger.debug("%s: func_button = %s", config["name"], func_button)
+            logger.debug("%s: filter_activator_name = %s", config["name"], filter_name)
+            logger.debug("%s: logic_entity = %s", config["name"], logic_entity)
+            logger.debug("%s: trigger_entity = %s", config["name"], trigger_entity)
+            logger.debug("%s: math_counter = %s", config["name"], math_counter)
+
+            config = bsp.get_config_raw(config, func_button, filter_name, logic_entity, trigger_entity, math_counter)
+
+            if point_template:
+                config["pt_spawner"] = point_template.targetname
+
+            logger.debug("%s: %s", config["name"], config)
 
             entwatch_config_list.append(config)
-            print(f"INFO: {config['name']}: done")
+            logger.debug("%s: done", config["name"])
 
+    return entwatch_config_list
+
+def fix_config(config):
+    def save_remove(c, k):
+        try:
+            c.pop(k, None)
+        except KeyError:
+            pass
+
+    logger.debug("Cleanup config from garbage")
+
+    for cfg in config:
+        save_remove(cfg, "buttonclass")
+        save_remove(cfg, "buttonname")
+        save_remove(cfg, "energyid")
+        save_remove(cfg, "triggerid")
+        save_remove(cfg, "triggername")
+
+        if cfg["mode"] == 1:
+            cfg["mode"] = "ENTWATCH_MODE_SPAM_PROTECTION_ONLY"
+        elif cfg["mode"] == 2:
+            cfg["mode"] = "ENTWATCH_MODE_COOLDOWNS"
+        elif cfg["mode"] == 3:
+            cfg["mode"] = "ENTWATCH_MODE_LIMITED_USES"
+        elif cfg["mode"] == 4:
+            cfg["mode"] = "ENTWATCH_MODE_COUNTER_FMIN_REACHED"
+        elif cfg["mode"] == 5:
+            cfg["mode"] = "ENTWATCH_MODE_COUNTER_FMAX_REACHED"
+        else:
+            cfg["mode"] = "ENTWATCH_MODE_NOBUTTON"
+
+    return config
+
+def save_config(config, out_config, as_spaces=False):
+    def format_one_config(cfg):
+        l = []
+        for key, value in cfg.items():
+            if isinstance(value, str):
+                if value[:8] != "ENTWATCH":
+                    value = "\"" + value + "\""
+            l.append(f"[\"{key}\"] = {value},")
+        return "\t{\n\t\t" + "\n\t\t".join(l) + "\n\t},\n"
+
+    with open(out_config, "w") as file:
+        file.write("return {\n")
+        for cfg in config:
+            text = format_one_config(cfg)
+            if as_spaces:
+                text = text.replace("\t", "    ")
+            file.write(text)
+        file.write("}")
+
+    logger.info("Config was saved to %s", out_config)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("source_path", help="BSP file")
+    parser.add_argument("out_config", help="Output config file")
+    parser.add_argument("-s", "--as-spaces", action="store_true", help="Save config file with spaces instead of tabs")
+    parser.add_argument("-c", "--no-clear-config", action="store_true", help="Do not clear config with useless variables")
     args = parser.parse_args()
 
-    main(args.source_path)
+    config = main(args.source_path)
+    if not args.no_clear_config:
+        config = fix_config(config)
+    save_config(config, args.out_config, as_spaces = args.as_spaces)
