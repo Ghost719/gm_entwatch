@@ -48,7 +48,7 @@ BLACKLIST_MATH_COUNTERS = [
 
 def tryint(x, fallback=False):
     try:
-        return int(x)
+        return round(float(x))
     except ValueError:
         pass
 
@@ -412,6 +412,8 @@ def fix_config(config):
         save_remove(cfg, "triggerid")
         save_remove(cfg, "triggername")
 
+        if len(cfg.get("filtername", "")) == 0:
+            save_remove(cfg, "filtername")
         if cfg.get("cooldown", 0) < 2:
             save_remove(cfg, "cooldown")
 
@@ -427,6 +429,7 @@ def fix_config(config):
             cfg["mode"] = "ENTWATCH_MODE_COUNTER_FMAX_REACHED"
         else:
             cfg["mode"] = "ENTWATCH_MODE_NOBUTTON"
+            save_remove(cfg, "filtername")
 
     return config
 
