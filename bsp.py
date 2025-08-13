@@ -5,7 +5,9 @@ from pprint import pprint
 import argparse
 import pyparsing as pp
 import logging
+import lzma
 import re
+import struct
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +59,13 @@ def tryint(x, fallback=False):
     else:
         return 0
 
+def get_logic_eventname(logic_entity):
+    if logic_entity.classname == "logic_compare":
+        return "OnEqualTo"
+    if logic_entity.classname == "logic_branch":
+        return "OnTrue"
+    return "OnTrigger"
+
 class EventParams:
     def __init__(self, line):
         self.targetname, self.targetinput, self.parameter, self.delay, self.refire = re.split(r"\s*,\s*", line)
@@ -89,7 +98,7 @@ class Entity:
                 self.filtername = y
             elif x[:8] == "Template":
                 self.templates.append(y)
-            elif x[:2] == "On":
+            elif x[:2] == "On" and x[2].isupper():
                 self.events.setdefault(x, [])
                 self.events[x].append(EventParams(y))
             else:
@@ -116,8 +125,15 @@ class ParseBSP:
         self.entity_list_by_parentname = {}
 
     def parse(self):
+        if self.lump_raw[:4] == b'LZMA':
+            header, actual_size, lzma_size, properties = struct.unpack_from("<III 5s", self.lump_raw)
+            self.lump_raw = struct.pack("<5s Q", properties, actual_size) + self.lump_raw[17:]
+            self.lump_raw = lzma.decompress(self.lump_raw)
+
         # avoid decoding errors
         lump_raw = self.lump_raw.decode("ascii", errors="ignore")
+        with open("test.lzma", "wb") as file:
+            file.write(self.lump_raw)
         lump_raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", lump_raw)
 
         # parse all entities
@@ -187,11 +203,7 @@ class ParseBSP:
     def find_entities_by_logic_entity(self, logic_entity):
         trigger_entity, math_counter = None, None
 
-        events = logic_entity.get_events("OnTrigger")
-        if not events:
-            events = logic_entity.get_events("OnEqualTo")
-
-        for params in events:
+        for params in logic_entity.get_events(get_logic_eventname(logic_entity)):
             entity = self.get_entity_by_targetname(params.targetname)
             if not entity:
                 continue
@@ -235,18 +247,27 @@ class ParseBSP:
         if filter_name and not logic_entity:
             logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
 
-        if logic_entity and not math_counter:
-            trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
+        #if logic_entity and not math_counter:
+        #    trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
 
         return func_button, filter_name, logic_entity, trigger_entity, math_counter
 
-    def find_all_by_parentname(self, parentname):
+    def find_all_by_parentname(self, weapon):
         func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
 
-        for entity in self.get_entities_by_parentname(parentname):
-            if entity.classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
+        parentname = weapon.targetname
+
+        for params in weapon.get_events("OnPlayerPickup"):
+            entity = self.get_entity_by_targetname(params.targetname)
+            if entity and entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"] and entity.parentname == parentname:
                 func_button = entity
                 break
+
+        if not func_button:
+            for entity in self.get_entities_by_parentname(parentname):
+                if entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
+                    func_button = entity
+                    break
 
         if func_button is None:
             return func_button, filter_name, logic_entity, trigger_entity, math_counter
@@ -283,6 +304,11 @@ class ParseBSP:
 
         logger.info("%s: found \"%s\" with hammerid = %i and targetname = \"%s\"", config["name"], config["buttonclass"], config["buttonid"], config["buttonname"])
 
+        if math_counter and tryint(math_counter.raw.get("max", 0)) > 2000:
+            math_counter = None
+        elif math_counter and tryint(math_counter.raw.get("min", 0)) == 0 and tryint(math_counter.raw.get("max", 0)) == 0 and tryint(math_counter.raw.get("startvalue", 0)) == 0:
+            math_counter = None
+
         if math_counter and math_counter.targetname not in BLACKLIST_MATH_COUNTERS:
             config["energyid"] = math_counter.hammerid
             config["energyname"] = math_counter.targetname
@@ -293,10 +319,17 @@ class ParseBSP:
 
         config["mode"] = 0
 
+        for params in func_button.get_events("OnPressed"):
+            if params.targetname == config.get("buttonname"):
+                if params.targetname == config.get("buttonname"):
+                    if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                        config["cooldown"] = tryint(params.delay)
+                        logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+
         if filter_name or logic_entity:
             lock, unlock, kill = False, False, False
 
-            for events in [filter_name and filter_name.get_events("OnPass") or [], logic_entity and logic_entity.get_events("OnTrigger") or []]:
+            for events in [filter_name and filter_name.get_events("OnPass") or [], logic_entity and logic_entity.get_events(get_logic_eventname(logic_entity)) or []]:
                 for params in events:
                     if params.targetname == config.get("buttonname"):
                         if params.targetinput == "Lock":
@@ -374,7 +407,7 @@ def main(source_path):
 
             point_template = bsp.find_point_template_by_weaponname(weapon.targetname)
             if not point_template:
-                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_parentname(weapon.targetname)
+                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_parentname(weapon)
             else:
                 func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template)
 
@@ -433,7 +466,7 @@ def fix_config(config):
 
     return config
 
-def save_config(config, out_config, as_spaces=False):
+def save_config(config, out_config, hard_tab=False):
     def format_one_config(cfg):
         l = []
         for key, value in cfg.items():
@@ -447,8 +480,8 @@ def save_config(config, out_config, as_spaces=False):
         file.write("return {\n")
         for cfg in config:
             text = format_one_config(cfg)
-            if as_spaces:
-                text = text.replace("\t", "    ")
+            if not hard_tab:
+                text = text.replace("\t", 4 * " ")
             file.write(text)
         file.write("}")
 
@@ -459,11 +492,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("source_path", help="BSP file")
     parser.add_argument("out_config", help="Output config file")
-    parser.add_argument("-s", "--as-spaces", action="store_true", help="Save config file with spaces instead of tabs")
+    parser.add_argument("-t", "--hard-tab", action="store_true", help="Save config file with hard tabs")
     parser.add_argument("-c", "--no-clear-config", action="store_true", help="Do not clear config with useless variables")
     args = parser.parse_args()
 
     config = main(args.source_path)
     if not args.no_clear_config:
         config = fix_config(config)
-    save_config(config, args.out_config, as_spaces = args.as_spaces)
+    save_config(config, args.out_config, hard_tab = args.hard_tab)
