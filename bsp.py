@@ -132,8 +132,6 @@ class ParseBSP:
 
         # avoid decoding errors
         lump_raw = self.lump_raw.decode("ascii", errors="ignore")
-        with open("test.lzma", "wb") as file:
-            file.write(self.lump_raw)
         lump_raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", lump_raw)
 
         # parse all entities
