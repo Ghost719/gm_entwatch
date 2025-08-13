@@ -257,22 +257,20 @@ class ParseBSP:
 
         return func_button, filter_name, logic_entity, trigger_entity, math_counter
 
-    def get_config_raw(self, config, func_button=None, filter_name=None, logic_entity=None, trigger_entity=None, math_counter=None):
+    def get_config_raw(self, config, weapon, func_button=None, filter_name=None, logic_entity=None, trigger_entity=None, math_counter=None):
         if not func_button:
             logger.info("%s: mode = ENTWATCH_MODE_NOBUTTON", config["name"])
             config["mode"] = 0
             return config
 
-        for params in func_button.get_events("OnPlayerPickup"):
+        for params in weapon.get_events("OnPlayerPickup"):
             if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
                 config["filtername"] = params.parameter[11:]
                 logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
-                break
 
-        if filter_name:
-            if not config.get("filtername"):
-                config["filtername"] = filter_name.filtername
-                logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
+        if filter_name and not config.get("filtername"):
+            config["filtername"] = filter_name.filtername
+            logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
         config["buttonclass"] = func_button.classname
         config["buttonid"] = func_button.hammerid
@@ -384,7 +382,7 @@ def main(source_path):
             logger.debug("%s: trigger_entity = %s", config["name"], trigger_entity)
             logger.debug("%s: math_counter = %s", config["name"], math_counter)
 
-            config = bsp.get_config_raw(config, func_button, filter_name, logic_entity, trigger_entity, math_counter)
+            config = bsp.get_config_raw(config, weapon, func_button, filter_name, logic_entity, trigger_entity, math_counter)
 
             if point_template:
                 config["pt_spawner"] = point_template.targetname
