@@ -46,6 +46,7 @@ CSS_WEAPONS = [
 # FIXME: ugly fix
 BLACKLIST_MATH_COUNTERS = [
     "pirate_counter", # ze_doom3_v1
+    "All_Staff_Wombo_Counter", "All_Zm_Wombo_Counter", # ze_ffxii_westersand_v8zeta1
 ]
 
 def tryint(x, fallback=False):
@@ -76,10 +77,10 @@ class EventParams:
 class Entity:
     def __init__(self, entity_info):
         self.hammerid = 0
-        self.classname = "None"
-        self.parentname = "None"
-        self.targetname = "None"
-        self.filtername = "None"
+        self.classname = ""
+        self.parentname = ""
+        self.targetname = ""
+        self.filtername = ""
         self.templates = []
         self.events = {}
         self.raw = {}
@@ -123,6 +124,7 @@ class ParseBSP:
         self.entity_list_by_names = {}
         self.entity_list_by_classes = {}
         self.entity_list_by_parentname = {}
+        self.entity_list_by_filtername = {}
 
     def parse(self):
         if self.lump_raw[:4] == b'LZMA':
@@ -146,14 +148,17 @@ class ParseBSP:
 
         # sort all by name and classname
         for entity in self.entity_list:
-            if entity.targetname is not None:
+            if entity.targetname:
                 self.entity_list_by_names.setdefault(entity.targetname, entity)
-            if entity.classname is not None:
+            if entity.classname:
                 self.entity_list_by_classes.setdefault(entity.classname, [])
                 self.entity_list_by_classes[entity.classname].append(entity)
-            if entity.parentname is not None:
+            if entity.parentname:
                 self.entity_list_by_parentname.setdefault(entity.parentname, [])
                 self.entity_list_by_parentname[entity.parentname].append(entity)
+            if entity.filtername:
+                self.entity_list_by_filtername.setdefault(entity.filtername, [])
+                self.entity_list_by_filtername[entity.filtername].append(entity)
 
     def get_entity_by_targetname(self, targetname):
         return self.entity_list_by_names.get(targetname)
@@ -163,20 +168,30 @@ class ParseBSP:
     
     def get_entities_by_parentname(self, parentname):
         return self.entity_list_by_parentname.get(parentname, [])
+    
+    def get_entities_by_filtername(self, filtername):
+        return self.entity_list_by_filtername.get(filtername, [])
 
     def find_point_template_by_weaponname(self, weaponname):
         for point_template in self.get_entities_by_classname("point_template"):
             if weaponname in point_template.templates:
                 return point_template
 
-    def find_filter_name_by_func_button(self, func_button):
+    def find_filter_name_by_func_button(self, func_button, weapon_filtername):
         filter_name = None
         for params in func_button.get_events("OnPressed"):
             entity = self.get_entity_by_targetname(params.targetname)
-            if entity is not None and entity.classname == "filter_activator_name":
+            if entity and entity.classname == "filter_activator_name" and entity.filtername == weapon_filtername:
                 filter_name = entity
                 break
+        if not filter_name:
+            return self.find_filter_name(weapon_filtername)
         return filter_name
+
+    def find_filter_name(self, weapon_filtername):
+        for entity in self.get_entities_by_filtername(weapon_filtername):
+            if entity and entity.classname == "filter_activator_name":
+                return entity
 
     def find_entities_by_filter_name(self, filter_name):
         logic_entity, trigger_entity, math_counter = None, None, None
@@ -195,6 +210,32 @@ class ParseBSP:
             if not math_counter and entity.classname == "math_counter":
                 math_counter = entity
                 continue
+
+        for params in filter_name.get_events("OnPass"):
+            if logic_entity:
+                break
+
+            entity = self.get_entity_by_targetname(params.targetname)
+            if not entity:
+                continue
+
+            for key, value in entity.events.items():
+                for params2 in value:
+                    entity2 = self.get_entity_by_targetname(params2.targetname)
+                    if entity2 and entity2.classname[:6] == "logic_":
+                        logic_entity = entity2
+                        break
+
+        if logic_entity:
+            for key, value in logic_entity.events.items():
+                if math_counter:
+                    break
+
+                for params in value:
+                    entity = self.get_entity_by_targetname(params.targetname)
+                    if entity and entity.classname == "math_counter":
+                        math_counter = entity
+                        break
 
         return logic_entity, trigger_entity, math_counter
 
@@ -215,7 +256,7 @@ class ParseBSP:
 
         return trigger_entity, math_counter
 
-    def find_all_by_point_template(self, point_template):
+    def find_all_by_point_template(self, point_template, weapon_filtername):
         func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
 
         for entname in point_template.templates:
@@ -223,7 +264,7 @@ class ParseBSP:
             if entity is None:
                 continue
 
-            if entity.classname in ["func_button", "func_rot_button", "func_physbox_multiplayer", "func_door", "func_door_rotating", "game_ui"]:
+            if entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
                 func_button = entity
                 continue
             if entity.classname == "filter_activator_name":
@@ -239,8 +280,8 @@ class ParseBSP:
                 math_counter = entity
                 continue
 
-        if not filter_name and func_button:
-            filter_name = self.find_filter_name_by_func_button(func_button)
+        if func_button and not filter_name:
+            filter_name = self.find_filter_name_by_func_button(func_button, weapon_filtername)
 
         if filter_name and not logic_entity:
             logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
@@ -250,28 +291,28 @@ class ParseBSP:
 
         return func_button, filter_name, logic_entity, trigger_entity, math_counter
 
-    def find_all_by_parentname(self, weapon):
+    def find_all_by_weapon(self, weapon, weapon_filtername):
         func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
 
-        parentname = weapon.targetname
-
-        for params in weapon.get_events("OnPlayerPickup"):
-            entity = self.get_entity_by_targetname(params.targetname)
-            if entity and entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"] and entity.parentname == parentname:
-                func_button = entity
-                break
+        filter_name = self.find_filter_name(weapon_filtername)
+        if filter_name:
+            for params in filter_name.get_events("OnPass"):
+                entity = self.get_entity_by_targetname(params.targetname)
+                if entity and entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
+                    func_button = entity
+                    break
 
         if not func_button:
-            for entity in self.get_entities_by_parentname(parentname):
+            for entity in self.get_entities_by_parentname(weapon.targetname):
                 if entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
                     func_button = entity
                     break
 
-        if func_button is None:
+        if not func_button:
             return func_button, filter_name, logic_entity, trigger_entity, math_counter
 
         if not filter_name:
-            filter_name = self.find_filter_name_by_func_button(func_button)
+            filter_name = self.find_filter_name_by_func_button(func_button, weapon_filtername)
 
         if filter_name:
             logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
@@ -286,11 +327,6 @@ class ParseBSP:
             logger.info("%s: mode = ENTWATCH_MODE_NOBUTTON", config["name"])
             config["mode"] = 0
             return config
-
-        for params in weapon.get_events("OnPlayerPickup"):
-            if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
-                config["filtername"] = params.parameter[11:]
-                logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
         if filter_name and not config.get("filtername"):
             config["filtername"] = filter_name.filtername
@@ -403,11 +439,16 @@ def main(source_path):
 
             logger.info("%s: hammerid = %i", config["name"], config["hammerid"])
 
+            for params in weapon.get_events("OnPlayerPickup"):
+                if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                    config["filtername"] = params.parameter[11:]
+                    logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
+
             point_template = bsp.find_point_template_by_weaponname(weapon.targetname)
             if not point_template:
-                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_parentname(weapon)
+                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_weapon(weapon, config["filtername"])
             else:
-                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template)
+                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template, config["filtername"])
 
             logger.debug("%s: func_button = %s", config["name"], func_button)
             logger.debug("%s: filter_activator_name = %s", config["name"], filter_name)

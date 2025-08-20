@@ -64,7 +64,7 @@ return {
         ["shortname"] = "Holy",
         ["filtername"] = "Player_Staff_Holy",
         ["hammerid"] = 2666037,
-        ["buttonid"] = 2666037,
+        ["buttonid"] = 2666019,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["cooldown"] = 20,
         ["pt_spawner"] = "Temp_Holy",
@@ -137,7 +137,7 @@ return {
         ["buttonid"] = 2708251,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 80,
-        ["pt_spawner"] = "Temp_Fire",
+        ["pt_spawner"] = "Temp_Firezm",
     },
     {
         ["name"] = "Zombie Frost Magick",

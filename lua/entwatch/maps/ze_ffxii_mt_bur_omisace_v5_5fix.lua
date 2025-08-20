@@ -43,8 +43,7 @@ return {
         ["filtername"] = "Chaos_Blade_Owner",
         ["hammerid"] = 11243956,
         ["buttonid"] = 11011477,
-        ["mode"] = ENTWATCH_MODE_LIMITED_USES,
-        ["maxuses"] = 2,
+        ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 75,
         ["pt_spawner"] = "Weapon_Chaos_Blade_Temp",
     },
@@ -114,6 +113,10 @@ return {
         ["maxuses"] = 2,
         ["cooldown"] = 75,
         ["pt_spawner"] = "Weapon_Shield_Temp",
+        --["energyname"] = "Item_Shield_Counter",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["currentvalue"] = 0,
+        --["hitmax"] = 2, -- max uses
     },
     {
         ["name"] = "Thunder Magick",
@@ -155,6 +158,10 @@ return {
         ["maxuses"] = 2,
         ["cooldown"] = 60,
         ["pt_spawner"] = "Weapon_blade_Temp",
+        --["energyname"] = "Item_Blade_Counter",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["currentvalue"] = 0,
+        --["hitmax"] = 2, -- max uses
     },
     {
         ["name"] = "Zombie Fire Magick",
@@ -170,7 +177,7 @@ return {
         ["name"] = "Zombie Mateus Spear",
         ["shortname"] = "ZM Spear",
         ["filtername"] = "Mateus_Spear_Z_Owner",
-        ["hammerid"] = 11417377,
+        ["hammerid"] = 11361504,
         ["buttonid"] = 11361429,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 80,

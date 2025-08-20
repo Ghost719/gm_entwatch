@@ -7,7 +7,6 @@ return {
         ["buttonid"] = 1587,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemGravityTemp",
     },
     {
         ["name"] = "Electro",
@@ -18,7 +17,6 @@ return {
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["maxuses"] = 3,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemElectroTemp",
     },
     {
         ["name"] = "Fire",
@@ -28,7 +26,6 @@ return {
         ["buttonid"] = 1422,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemFireTemp",
     },
     {
         ["name"] = "Ice",
@@ -38,7 +35,6 @@ return {
         ["buttonid"] = 1398,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemIceTemp",
     },
     {
         ["name"] = "Heal",
@@ -48,7 +44,6 @@ return {
         ["buttonid"] = 1494,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 50,
-        ["pt_spawner"] = "ItemHealTemp",
     },
     {
         ["name"] = "Earth",
@@ -58,7 +53,6 @@ return {
         ["buttonid"] = 1463,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemEarthTemp",
     },
     {
         ["name"] = "Wind",
@@ -68,7 +62,6 @@ return {
         ["buttonid"] = 1440,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
-        ["pt_spawner"] = "ItemWindTemp",
     },
     {
         ["name"] = "Ultima",
@@ -78,6 +71,5 @@ return {
         ["buttonid"] = 1364,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["cooldown"] = 20,
-        ["pt_spawner"] = "ItemUltimaTemp",
     },
 }
