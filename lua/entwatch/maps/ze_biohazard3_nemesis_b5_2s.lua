@@ -17,6 +17,7 @@ return {
         ["energyname"] = "flame_counter",
         ["mode"] = ENTWATCH_MODE_COUNTER_FMIN_REACHED,
         ["pt_spawner"] = "flame_temp",
+        --["currentvalue"] = 20, -- in seconds (default: 20)
     },
     {
         ["name"] = "Shotgun",
@@ -27,6 +28,9 @@ return {
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["maxuses"] = 5,
         ["cooldown"] = 2,
+        --["energyname"] = "shotgunammo",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["hitmax"] = 5, -- max uses
     },
     {
         ["name"] = "Knife",
