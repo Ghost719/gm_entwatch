@@ -118,9 +118,7 @@ function EntWatch.OnWeaponDropped(owner, weapon)
     end
 
     if owner and owner:IsValid() then
-        if isstring(owner.m_DefaultName) then
-            owner:SetName(owner.m_DefaultName)
-        end
+        owner:SetName("player")
 
         if !owner:Alive() then
             net.Start("entwatch")
@@ -418,12 +416,6 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
                 parent:SetMateriaUseMax(ent.m_flMax)
             end
         end
-    end
-end)
-
-hook.Add("PlayerSpawn", "EntWatch.PlayerSpawn", function(ply)
-    if !ply.m_DefaultName then
-        ply.m_DefaultName = ply:GetName()
     end
 end)
 
