@@ -139,7 +139,7 @@ return {
         ["hammerid"] = 3468411,
         ["buttonid"] = 3468276,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
-        ["cooldown"] = 70,
+        ["cooldown"] = 75,
         ["pt_spawner"] = "Item_Z_Confuse_itemtemp",
     },
     {

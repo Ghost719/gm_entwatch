@@ -1,11 +1,18 @@
 return {
     {
+        ["name"] = "Diamond Pickaxe",
+        ["shortname"] = "Pickaxe",
+        ["hammerid"] = 120494,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
         ["name"] = "Sword",
         ["shortname"] = "Sword",
         ["hammerid"] = 13270,
         ["buttonid"] = 193544,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 45,
+        ["pt_spawner"] = "sword_template",
     },
     {
         ["name"] = "River Axe",
@@ -19,6 +26,7 @@ return {
         ["hammerid"] = 182215,
         ["buttonid"] = 182281,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
+        ["pt_spawner"] = "heal1_template",
     },
     {
         ["name"] = "Steel",
@@ -36,8 +44,8 @@ return {
         ["name"] = "Firemines",
         ["shortname"] = "Firemines",
         ["hammerid"] = 948183,
-        ["buttonid"] = 948192,
-        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+        ["mode"] = ENTWATCH_MODE_SPAM_PROTECTION_ONLY,
+        ["pt_spawner"] = "flintsteel_template",
     },
     {
         ["name"] = "Wall",
@@ -51,19 +59,20 @@ return {
     },
     {
         ["name"] = "Dragon Egg",
-        ["shortname"] = "Egg",
+        ["shortname"] = "Dragon Egg",
         ["hammerid"] = 1175908,
         ["buttonid"] = 1175905,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["cooldown"] = 5,
+        ["pt_spawner"] = "end_template",
     },
     {
         ["name"] = "Torch",
         ["shortname"] = "Torch",
         ["hammerid"] = 1312275,
-        ["buttonid"] = 1714938,
+        ["buttonid"] = 1312270,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
-        ["cooldown"] = 2,
+        ["pt_spawner"] = "torch_template",
     },
     {
         ["name"] = "Torch",
@@ -71,7 +80,7 @@ return {
         ["hammerid"] = 1312443,
         ["buttonid"] = 1604876,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
-        ["cooldown"] = 2,
+        ["pt_spawner"] = "torch_template2",
     },
     {
         ["name"] = "Bow And Arrows",
@@ -80,12 +89,66 @@ return {
         ["buttonid"] = 1657977,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 9,
+        ["pt_spawner"] = "bow_template2",
     },
     {
-        ["name"] = "Diamond Pickaxe",
-        ["shortname"] = "Pickaxe",
-        ["hammerid"] = 120494,
+        ["name"] = "Diamond",
+        ["shortname"] = "Diamond",
+        ["hammerid"] = 1872173,
         ["mode"] = ENTWATCH_MODE_NOBUTTON,
     },
-    -- алмаз и 9 редстоунов на 3 этапе
+    --[[{
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927698,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927704,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927710,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927974,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927976,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1927978,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1941045,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1941047,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },
+    {
+        ["name"] = "Redstone Torch",
+        ["shortname"] = "Redstone Torch",
+        ["hammerid"] = 1941049,
+        ["mode"] = ENTWATCH_MODE_NOBUTTON,
+    },--]]
 }

@@ -15,6 +15,10 @@ return {
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["maxuses"] = 5,
         ["cooldown"] = 2,
+        --["energyname"] = "mine_limit",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["hitmax"] = 5, -- max uses
+        ["pt_spawner"] = "mine_tele",
     },
     {
         ["name"] = "Ammo Box",
@@ -25,6 +29,10 @@ return {
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["maxuses"] = 2,
         ["cooldown"] = 60,
+        --["energyname"] = "ammo_counter",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["hitmax"] = 2, -- max uses
+        ["pt_spawner"] = "ammo_template",
     },
     {
         ["name"] = "Mountain Dew",
@@ -35,6 +43,7 @@ return {
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
         ["maxuses"] = 2,
         ["cooldown"] = 10,
+        ["pt_spawner"] = "Item_Heal_Temp",
     },
     {
         ["name"] = "Bubble Gun",
@@ -44,6 +53,7 @@ return {
         ["buttonid"] = 309380,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
         ["cooldown"] = 55,
+        ["pt_spawner"] = "item_electricmaker",
     },
     {
         ["name"] = "Rainbow Flamethrower",
@@ -53,6 +63,8 @@ return {
         ["buttonid"] = 311975,
         ["energyname"] = "flame_counter",
         ["mode"] = ENTWATCH_MODE_COUNTER_FMIN_REACHED,
+        --["currentvalue"] = 20, -- in seconds (default: 20)
+        ["pt_spawner"] = "flame_tele",
     },
     {
         ["name"] = "UFO",

@@ -199,9 +199,14 @@ return {
         ["filtername"] = "Highway_Star_Z_Owner",
         ["hammerid"] = 11007167,
         ["buttonid"] = 11007174,
-        ["mode"] = ENTWATCH_MODE_COOLDOWNS,
+        ["mode"] = ENTWATCH_MODE_LIMITED_USES,
+        ["maxuses"] = 2,
         ["cooldown"] = 70,
         ["pt_spawner"] = "Weapon_Z_Highway_Star_Temp",
+        --["energyname"] = "Item_Z_Highway_Star_Counter",
+        --["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        --["currentvalue"] = 0,
+        --["hitmax"] = 2, -- max uses
     },
     {
         ["name"] = "Zombie Fear Magick",
