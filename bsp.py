@@ -43,10 +43,24 @@ CSS_WEAPONS = [
     "weapon_m249",
 ]
 
-# FIXME: ugly fix
-BLACKLIST_MATH_COUNTERS = [
-    "pirate_counter", # ze_doom3_v1
-    "All_Staff_Wombo_Counter", "All_Zm_Wombo_Counter", # ze_ffxii_westersand_v8zeta1
+BUTTON_ENTITIES_EVENTS = [
+    "OnPressed",
+]
+
+MATH_COUNTER_ENTITIES_EVENTS = [
+    "OnHitMin",
+    "OnHitMax",
+]
+
+FILTER_ENTITIES_EVENTS = [
+    "OnPass",
+    "OnFail",
+]
+
+LOGIC_ENTITIES_EVENTS = [
+    "OnTrigger", # logic_relay
+    "OnTrue", # logic_branch
+    "OnEqualTo", # logic_compare
 ]
 
 def tryint(x, fallback=False):
@@ -108,8 +122,12 @@ class Entity:
     def __repr__(self):
         return f"Entity(hammerid={self.hammerid}, classname=\"{self.classname}\", parentname=\"{self.parentname}\", targetname=\"{self.targetname}\", filtername=\"{self.filtername}\", templates={self.templates}, events={self.events}, raw={self.raw})"
 
-    def get_events(self, name):
-        return self.events.get(name, [])
+    def get_events(self, *args):
+        for name in args:
+            params = self.events.get(name, [])
+            if len(params) > 0:
+                return params
+        return []
 
 class ParseBSP:
     def __init__(self, source_path):
@@ -177,26 +195,35 @@ class ParseBSP:
             if weaponname in point_template.templates:
                 return point_template
 
-    def find_filter_name_by_func_button(self, func_button, weapon_filtername):
-        filter_name = None
-        for params in func_button.get_events("OnPressed"):
-            entity = self.get_entity_by_targetname(params.targetname)
-            if entity and entity.classname == "filter_activator_name" and entity.filtername == weapon_filtername:
-                filter_name = entity
-                break
-        if not filter_name:
-            return self.find_filter_name(weapon_filtername)
-        return filter_name
+    def find_filter_by_func_button(self, func_button, weapon_filtername):
+        filter_activator_name = None
 
-    def find_filter_name(self, weapon_filtername):
+        if weapon_filtername == "":
+            return None
+
+        for params in func_button.get_events(*BUTTON_ENTITIES_EVENTS):
+            entity = self.get_entity_by_targetname(params.targetname)
+            if entity and entity.classname[:7] == "filter_" and entity.filtername == weapon_filtername:
+                filter_activator_name = entity
+                break
+
+        if not filter_activator_name:
+            return self.find_filter(weapon_filtername)
+        else:
+            return filter_activator_name
+
+    def find_filter(self, weapon_filtername):
+        if weapon_filtername == "":
+            return None
+
         for entity in self.get_entities_by_filtername(weapon_filtername):
-            if entity and entity.classname == "filter_activator_name":
+            if entity and entity.classname[:7] == "filter_":
                 return entity
 
-    def find_entities_by_filter_name(self, filter_name):
+    def find_entities_by_filter_activator_name(self, filter_activator_name):
         logic_entity, trigger_entity, math_counter = None, None, None
 
-        for params in filter_name.get_events("OnPass"):
+        for params in filter_activator_name.get_events(*FILTER_ENTITIES_EVENTS):
             entity = self.get_entity_by_targetname(params.targetname)
             if not entity:
                 continue
@@ -211,7 +238,7 @@ class ParseBSP:
                 math_counter = entity
                 continue
 
-        for params in filter_name.get_events("OnPass"):
+        for params in filter_activator_name.get_events(*FILTER_ENTITIES_EVENTS):
             if logic_entity:
                 break
 
@@ -242,7 +269,7 @@ class ParseBSP:
     def find_entities_by_logic_entity(self, logic_entity):
         trigger_entity, math_counter = None, None
 
-        for params in logic_entity.get_events(get_logic_eventname(logic_entity)):
+        for params in logic_entity.get_events(*LOGIC_ENTITIES_EVENTS):
             entity = self.get_entity_by_targetname(params.targetname)
             if not entity:
                 continue
@@ -257,7 +284,7 @@ class ParseBSP:
         return trigger_entity, math_counter
 
     def find_all_by_point_template(self, point_template, weapon_filtername):
-        func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
+        func_button, filter_activator_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
 
         for entname in point_template.templates:
             entity = self.get_entity_by_targetname(entname)
@@ -267,8 +294,8 @@ class ParseBSP:
             if entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
                 func_button = entity
                 continue
-            if entity.classname == "filter_activator_name":
-                filter_name = entity
+            if entity.classname[:7] == "filter_":
+                filter_activator_name = entity
                 continue
             if entity.classname[:6] == "logic_":
                 logic_entity = entity
@@ -280,23 +307,23 @@ class ParseBSP:
                 math_counter = entity
                 continue
 
-        if func_button and not filter_name:
-            filter_name = self.find_filter_name_by_func_button(func_button, weapon_filtername)
+        if func_button and not filter_activator_name:
+            filter_activator_name = self.find_filter_by_func_button(func_button, weapon_filtername)
 
-        if filter_name and not logic_entity:
-            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
+        if filter_activator_name and not logic_entity:
+            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_activator_name(filter_activator_name)
 
-        #if logic_entity and not math_counter:
-        #    trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
+        if logic_entity and not math_counter:
+            trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
 
-        return func_button, filter_name, logic_entity, trigger_entity, math_counter
+        return func_button, filter_activator_name, logic_entity, trigger_entity, math_counter
 
     def find_all_by_weapon(self, weapon, weapon_filtername):
-        func_button, filter_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
+        func_button, filter_activator_name, logic_entity, trigger_entity, math_counter = None, None, None, None, None
 
-        filter_name = self.find_filter_name(weapon_filtername)
-        if filter_name:
-            for params in filter_name.get_events("OnPass"):
+        filter_activator_name = self.find_filter(weapon_filtername)
+        if filter_activator_name:
+            for params in filter_activator_name.get_events(*FILTER_ENTITIES_EVENTS):
                 entity = self.get_entity_by_targetname(params.targetname)
                 if entity and entity.classname in ["func_button", "func_rot_button", "func_door", "func_door_rotating", "game_ui"]:
                     func_button = entity
@@ -309,28 +336,49 @@ class ParseBSP:
                     break
 
         if not func_button:
-            return func_button, filter_name, logic_entity, trigger_entity, math_counter
+            return func_button, filter_activator_name, logic_entity, trigger_entity, math_counter
 
-        if not filter_name:
-            filter_name = self.find_filter_name_by_func_button(func_button, weapon_filtername)
+        if not filter_activator_name:
+            filter_activator_name = self.find_filter_by_func_button(func_button, weapon_filtername)
 
-        if filter_name:
-            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_name(filter_name)
+        if filter_activator_name:
+            logic_entity, trigger_entity, math_counter = self.find_entities_by_filter_activator_name(filter_activator_name)
 
         if logic_entity:
             trigger_entity, math_counter = self.find_entities_by_logic_entity(logic_entity)
 
-        return func_button, filter_name, logic_entity, trigger_entity, math_counter
+        return func_button, filter_activator_name, logic_entity, trigger_entity, math_counter
 
-    def get_config_raw(self, config, weapon, func_button=None, filter_name=None, logic_entity=None, trigger_entity=None, math_counter=None):
+    def get_config_raw(self, config, weapon, func_button=None, filter_activator_name=None, logic_entity=None, trigger_entity=None, math_counter=None):
         if not func_button:
             logger.info("%s: mode = ENTWATCH_MODE_NOBUTTON", config["name"])
             config["mode"] = 0
             return config
 
-        if filter_name and not config.get("filtername"):
-            config["filtername"] = filter_name.filtername
-            logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
+        if filter_activator_name:
+            filtername = config.get("filtername")
+
+            if filtername is None or filtername == "":
+                config["filtername"] = filter_activator_name.filtername
+                logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
+
+            if filter_activator_name.classname == "filter_multi":
+                filters = []
+
+                for i in range(1, 100):
+                    name = filter_activator_name.raw.get(f"Filter{i:02}")
+                    if not name:
+                        break
+
+                    entity = self.get_entity_by_targetname(name)
+                    if entity:
+                        filters.append(entity)
+
+                for entity in filters:
+                    for params in entity.get_events(*FILTER_ENTITIES_EVENTS):
+                        if params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                            config["filtername"] = params.parameter[11:]
+                            logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
         config["buttonclass"] = func_button.classname
         config["buttonid"] = func_button.hammerid
@@ -343,9 +391,19 @@ class ParseBSP:
         elif math_counter and tryint(math_counter.raw.get("min", 0)) == 0 and tryint(math_counter.raw.get("max", 0)) == 0 and tryint(math_counter.raw.get("startvalue", 0)) == 0:
             math_counter = None
 
-        if math_counter and math_counter.targetname not in BLACKLIST_MATH_COUNTERS:
-            config["energyid"] = math_counter.hammerid
-            config["energyname"] = math_counter.targetname
+        if math_counter:
+            found_button = False
+
+            for params in math_counter.get_events(*MATH_COUNTER_ENTITIES_EVENTS):
+                if params.targetname == config["buttonname"]:
+                    found_button = True
+                    break
+
+            if not found_button:
+                math_counter = None
+            else:
+                config["energyid"] = math_counter.hammerid
+                config["energyname"] = math_counter.targetname
 
         if trigger_entity:
             config["triggerid"] = trigger_entity.hammerid
@@ -353,39 +411,44 @@ class ParseBSP:
 
         config["mode"] = 0
 
-        for params in func_button.get_events("OnPressed"):
+        for params in func_button.get_events(*BUTTON_ENTITIES_EVENTS):
             if params.targetname == config.get("buttonname"):
                 if params.targetname == config.get("buttonname"):
                     if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
                         config["cooldown"] = tryint(params.delay)
                         logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
 
-        if filter_name or logic_entity:
+        if filter_activator_name or logic_entity:
             lock, unlock, kill = False, False, False
 
-            for events in [filter_name and filter_name.get_events("OnPass") or [], logic_entity and logic_entity.get_events(get_logic_eventname(logic_entity)) or []]:
-                for params in events:
-                    if params.targetname == config.get("buttonname"):
-                        if params.targetinput == "Lock":
-                            lock = True
-                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
-                            unlock = True
-                            config["cooldown"] = tryint(params.delay)
-                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
-                        if params.targetinput == "Kill":
-                            kill = True
+            events = []
+            if filter_activator_name:
+                events += filter_activator_name.get_events(*FILTER_ENTITIES_EVENTS)
+            if logic_entity:
+                events += logic_entity.get_events(*LOGIC_ENTITIES_EVENTS)
 
-                    if params.targetname == config.get("triggername"):
-                        if params.targetinput == "Enable" and config.get("cooldown", 0) == 0:
-                            config["cooldown"] = tryint(params.delay)
-                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+            for params in events:
+                if params.targetname == config.get("buttonname"):
+                    if params.targetinput == "Lock":
+                        lock = True
+                    if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                        unlock = True
+                        config["cooldown"] = tryint(params.delay)
+                        logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
+                    if params.targetinput == "Kill":
+                        kill = True
+
+                if params.targetname == config.get("triggername"):
+                    if params.targetinput == "Enable" and config.get("cooldown", 0) == 0:
+                        config["cooldown"] = tryint(params.delay)
+                        logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
 
             if lock and not unlock or kill:
                 logger.info("%s: mode = ENTWATCH_MODE_LIMITED_USES", config["name"])
                 config["mode"] = 3
                 return config
 
-        if math_counter and math_counter.targetname not in BLACKLIST_MATH_COUNTERS:
+        if math_counter:
             if math_counter.raw.get("startvalue") is not None:
                 config["currentvalue"] = tryint(math_counter.raw.get("startvalue"), fallback=True)
             if math_counter.raw.get("min") is not None:
@@ -396,23 +459,17 @@ class ParseBSP:
             if len(math_counter.get_events("OnHitMin")) > 0:
                 logger.info("%s: mode = ENTWATCH_MODE_COUNTER_FMIN_REACHED", config["name"])
                 config["mode"] = 4
-
-                for params in math_counter.get_events("OnHitMin"):
-                    if params.targetname == config.get("buttonname"):
-                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
-                            config["cooldown"] = tryint(params.delay)
-                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
             elif len(math_counter.get_events("OnHitMax")) > 0:
                 logger.info("%s: mode = ENTWATCH_MODE_COUNTER_FMAX_REACHED", config["name"])
                 config["mode"] = 5
-
-                for params in math_counter.get_events("OnHitMax"):
-                    if params.targetname == config.get("buttonname"):
-                        if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
-                            config["cooldown"] = tryint(params.delay)
-                            logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
             else:
                 logger.error(f"%s: math_counter found, but mode is not valid", config["name"])
+
+            for params in math_counter.get_events(*MATH_COUNTER_ENTITIES_EVENTS):
+                if params.targetname == config.get("buttonname"):
+                    if params.targetinput == "Unlock" and config.get("cooldown", 0) == 0:
+                        config["cooldown"] = tryint(params.delay)
+                        logger.info("%s: cooldown = %i", config["name"], config["cooldown"])
 
             return config
 
@@ -440,23 +497,23 @@ def main(source_path):
             logger.info("%s: hammerid = %i", config["name"], config["hammerid"])
 
             for params in weapon.get_events("OnPlayerPickup"):
-                if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                if params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
                     config["filtername"] = params.parameter[11:]
                     logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
             point_template = bsp.find_point_template_by_weaponname(weapon.targetname)
             if not point_template:
-                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_weapon(weapon, config["filtername"])
+                func_button, filter_activator_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_weapon(weapon, config["filtername"])
             else:
-                func_button, filter_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template, config["filtername"])
+                func_button, filter_activator_name, logic_entity, trigger_entity, math_counter = bsp.find_all_by_point_template(point_template, config["filtername"])
 
             logger.debug("%s: func_button = %s", config["name"], func_button)
-            logger.debug("%s: filter_activator_name = %s", config["name"], filter_name)
+            logger.debug("%s: filter_activator_name = %s", config["name"], filter_activator_name)
             logger.debug("%s: logic_entity = %s", config["name"], logic_entity)
             logger.debug("%s: trigger_entity = %s", config["name"], trigger_entity)
             logger.debug("%s: math_counter = %s", config["name"], math_counter)
 
-            config = bsp.get_config_raw(config, weapon, func_button, filter_name, logic_entity, trigger_entity, math_counter)
+            config = bsp.get_config_raw(config, weapon, func_button, filter_activator_name, logic_entity, trigger_entity, math_counter)
 
             if point_template:
                 config["pt_spawner"] = point_template.targetname
@@ -501,7 +558,6 @@ def fix_config(config):
             cfg["mode"] = "ENTWATCH_MODE_COUNTER_FMAX_REACHED"
         else:
             cfg["mode"] = "ENTWATCH_MODE_NOBUTTON"
-            save_remove(cfg, "filtername")
 
     return config
 
