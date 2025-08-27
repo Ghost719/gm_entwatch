@@ -1,6 +1,13 @@
 EntWatch = EntWatch or {}
 EntWatch.CachedEntities = EntWatch.CachedEntities or {}
 
+EntWatch.MapConfig = EntWatch.MapConfig or {}
+
+if file.Exists("entwatch/maps/" .. game.GetMap() .. ".lua", "LUA") then
+    AddCSLuaFile("entwatch/maps/" .. game.GetMap() .. ".lua")
+    EntWatch.MapConfig = include("entwatch/maps/" .. game.GetMap() .. ".lua")
+end
+
 ENTWATCH_MODE_NOBUTTON = 0
 ENTWATCH_MODE_SPAM_PROTECTION_ONLY = 1
 ENTWATCH_MODE_COOLDOWNS = 2

@@ -1,11 +1,5 @@
 util.AddNetworkString("entwatch")
 
-EntWatch.MapConfig = {}
-
-if file.Exists("entwatch/maps/" .. game.GetMap() .. ".lua", "LUA") then
-    EntWatch.MapConfig = include("entwatch/maps/" .. game.GetMap() .. ".lua")
-end
-
 function EntWatch.GetConfig(key, value)
     for _, config in ipairs(EntWatch.MapConfig) do
         if config[key] == value then

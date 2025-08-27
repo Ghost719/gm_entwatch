@@ -4,14 +4,12 @@ local CATEGORY_NAME = "EntWatch"
 
 ulx.entwatch_spawners = {}
 
-hook.Add("InitPostEntity", "ulx.entwatch_spawners", function()
-    if !EntWatch or !SERVER then return end
-
-    ulx.entwatch_spawners = {}
+hook.Add("Initialize", "ulx.entwatch_spawners", function()
+    if !EntWatch then return end
 
     for _, cfg in ipairs(EntWatch.MapConfig) do
         if isstring(cfg.pt_spawner) and #cfg.pt_spawner > 0 then
-            ulx.entwatch_spawners[#ulx.entwatch_spawners + 1] = cfg.pt_spawner
+            table.insert(ulx.entwatch_spawners, cfg.pt_spawner)
         end
     end
 end)
@@ -55,7 +53,7 @@ function ulx.ew_spawnitem(calling_ply, target_ply, name)
 end
 local ew_spawnitem = ulx.command(CATEGORY_NAME, "ulx ew_spawnitem", ulx.ew_spawnitem, "!ew_spawnitem")
 ew_spawnitem:addParam{ type=ULib.cmds.PlayerArg }
-ew_spawnitem:addParam{ type=ULib.cmds.StringArg, completes=ulx.entwatch_spawners, hint="pt_spawner", error="invalid pt_spawner \"%s\" specified", ULib.cmds.restrictToCompletes }
+ew_spawnitem:addParam{ type=ULib.cmds.StringArg, hint="pt_spawner", ULib.cmds.optional, ULib.cmds.takeRestOfLine, completes=ulx.entwatch_spawners }
 ew_spawnitem:defaultAccess( ULib.ACCESS_ADMIN )
 ew_spawnitem:help("Spawn materia at the given player")
 
