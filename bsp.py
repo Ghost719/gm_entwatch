@@ -376,7 +376,7 @@ class ParseBSP:
 
                 for entity in filters:
                     for params in entity.get_events(*FILTER_ENTITIES_EVENTS):
-                        if params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                        if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
                             config["filtername"] = params.parameter[11:]
                             logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
@@ -497,7 +497,7 @@ def main(source_path):
             logger.info("%s: hammerid = %i", config["name"], config["hammerid"])
 
             for params in weapon.get_events("OnPlayerPickup"):
-                if params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
+                if params.targetname == "!activator" and params.targetinput == "AddOutput" and params.parameter[:11] == "targetname ":
                     config["filtername"] = params.parameter[11:]
                     logger.info("%s: filtername = \"%s\"", config["name"], config["filtername"])
 
