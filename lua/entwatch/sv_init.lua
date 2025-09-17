@@ -29,6 +29,25 @@ function EntWatch.GetConfigByEntity(ent, key, name)
     end
 end
 
+function EntWatch.FindEntityRecursively(ent, entclass, val)
+    if !val then val = 4 end
+
+    for _, child in ipairs(ent:GetChildren()) do
+        if child:GetClass() == entclass then
+            return child
+        end
+
+        if #child:GetChildren() > 0 then
+            local ent = EntWatch.FindEntityRecursively(child, entclass, val - 1)
+            if ent ~= nil then
+                return ent
+            end
+        end
+    end
+
+    return nil
+end
+
 function EntWatch.OnWeaponInit(weapon)
     local config = EntWatch.GetConfigByEntity(weapon, "hammer")
     if !config then
@@ -61,13 +80,24 @@ function EntWatch.OnWeaponPickup(owner, weapon)
         -- if the func_button entity is not valid, we'll find them
         if !weapon:GetMateriaButton() or !weapon:GetMateriaButton():IsValid() then
             local buttonclass = config.buttonclass or "func_button"
-            for _, button in ipairs(ents.FindByClass(buttonclass)) do
-                if button:GetHammerID() == config.buttonid or button:GetName() == config.buttonname then
+
+            if config.buttonid or config.buttonname then
+                for _, button in ipairs(ents.FindByClass(buttonclass)) do
+                    if button:GetHammerID() == config.buttonid or button:GetName() == config.buttonname then
+                        weapon:SetMateriaButton(button)
+                        button:SetMateriaParent(weapon)
+
+                        EntWatch.OnButtonInit(button)
+                        break
+                    end
+                end
+            else
+                local button = EntWatch.FindEntityRecursively(weapon, buttonclass)
+                if button and button:IsValid() then
                     weapon:SetMateriaButton(button)
                     button:SetMateriaParent(weapon)
 
                     EntWatch.OnButtonInit(button)
-                    break
                 end
             end
         end
@@ -127,22 +157,37 @@ end
 
 function EntWatch.OnButtonInit(button)
     local config = EntWatch.GetConfigByEntity(button, "button")
-    if !config then return false end
 
-    -- if the parent weapon is not valid, we'll find them
-    if !button:GetMateriaParent() or !button:GetMateriaParent():IsValid() then
-        for _, ent in ents.Iterator() do
-            if !ENTWATCH_CSSWEAPONS[ent:GetClass()] then continue end
+    if config then
+        if !button:GetMateriaParent() or !button:GetMateriaParent():IsValid() then
+            for _, ent in ents.Iterator() do
+                if !ENTWATCH_CSSWEAPONS[ent:GetClass()] then continue end
 
-            if ent:GetHammerID() == config.hammerid then
-                ent:SetMateriaButton(button)
-                button:SetMateriaParent(ent)
-                break
+                if ent:GetHammerID() == config.hammerid then
+                    ent:SetMateriaButton(button)
+                    button:SetMateriaParent(ent)
+
+                    return true
+                end
+            end
+        end
+    else
+        local ent = button:GetParent()
+
+        while IsValid(ent) do
+            if ENTWATCH_CSSWEAPONS[ent:GetClass()] then
+                config = EntWatch.GetConfigByEntity(ent, "hammer")
+                if config then
+                    ent:SetMateriaButton(button)
+                    button:SetMateriaParent(ent)
+
+                    return true
+                end
             end
         end
     end
 
-    return true
+    return false
 end
 
 function EntWatch.OnButtonPressed(button)
