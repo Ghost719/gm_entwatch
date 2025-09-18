@@ -281,11 +281,11 @@ function EntWatch.OnCounterInit(counter)
 
     local parent = counter:GetMateriaParent()
     if parent and parent:IsValid() then
-        parent:SetMateriaUseCount(counter.m_OutValue)
-
         if config.mode == ENTWATCH_MODE_COUNTER_FMIN_REACHED then
+            parent:SetMateriaUseCount(counter.m_OutValue)
             parent:SetMateriaUseMax(counter.m_InitialValue)
         else
+            parent:SetMateriaUseCount(counter.m_flMax - counter.m_OutValue)
             parent:SetMateriaUseMax(counter.m_flMax)
         end
     end
@@ -447,11 +447,11 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
         end
 
         if parent and parent:IsValid() then
-            parent:SetMateriaUseCount(ent.m_OutValue)
-
             if parent:GetMateriaMode() == ENTWATCH_MODE_COUNTER_FMIN_REACHED then
+                parent:SetMateriaUseCount(ent.m_OutValue)
                 parent:SetMateriaUseMax(ent.m_InitialValue)
             else
+                parent:SetMateriaUseCount(ent.m_flMax - ent.m_OutValue)
                 parent:SetMateriaUseMax(ent.m_flMax)
             end
         end

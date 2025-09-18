@@ -112,20 +112,6 @@ return {
         ["pt_spawner"] = "item_gravity_temp",
     },
     {
-        ["name"] = "Zombie Infused",
-        ["shortname"] = "ZM Infused",
-        ["hammerid"] = 3053045,
-        ["mode"] = ENTWATCH_MODE_NOBUTTON,
-        ["pt_spawner"] = "Infused_Template",
-    },
-    {
-        ["name"] = "Zombie Jail",
-        ["shortname"] = "ZM Jail",
-        ["hammerid"] = 3108077,
-        ["mode"] = ENTWATCH_MODE_NOBUTTON,
-        ["pt_spawner"] = "Zombie_Jail_Knife_Template",
-    },
-    {
         ["name"] = "Mimic",
         ["shortname"] = "Mimic",
         ["filtername"] = "player_mimic",
