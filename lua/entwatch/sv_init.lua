@@ -252,15 +252,15 @@ function EntWatch.OnButtonKilled(button)
 end
 
 function EntWatch.OnCounterInit(counter)
-    local config = EntWatch.GetConfigByEntity(counter, "energy")
-    if !config then return false end
-
     -- sets the default values
     counter.m_OutValue = counter.m_OutValue or 0
     counter.m_InitialValue = counter.m_InitialValue or 0
     counter.m_flMin = counter.m_flMin or 0
     counter.m_flMax = counter.m_flMax or 2000
     counter.m_bDisabled = counter.m_bDisabled or false
+
+    local config = EntWatch.GetConfigByEntity(counter, "energy")
+    if !config then return false end
 
     if config.currentvalue then counter:Fire("SetValue", config.currentvalue) end
     if config.hitmax then counter:Fire("SetHitMax", config.hitmax) end
@@ -410,7 +410,7 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
     end
 
     -- checking the "math_counter" entity
-    if ent:GetClass() == "math_counter" and EntWatch.GetConfigByEntity(ent, "energy") then
+    if ent:GetClass() == "math_counter" then
         local valuenew = tonumber(value) or 0
 
         -- a random shit to get right value from engine
