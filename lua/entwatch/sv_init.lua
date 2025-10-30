@@ -9,13 +9,13 @@ function EntWatch.GetConfig(key, value)
 end
 
 function EntWatch.GetConfigByEntity(ent, key, name)
-    if ent:GetMateriaConfig() then
-        return ent:GetMateriaConfig()
+    local config = ent:GetMateriaConfig()
+    if config then
+        return config
     end
 
     name = name or ent:GetName()
 
-    local config
     for _, tbl in ipairs(EntWatch.MapConfig) do
         if tbl[key.."id"] == ent:GetHammerID() or tbl[key.."name"] == name then
             config = tbl
@@ -121,6 +121,7 @@ function EntWatch.OnWeaponPickup(owner, weapon)
     if IsValid(owner) then
         -- allows you to use a materia after another player has used and dropped the materia
         if isstring(config.filtername) then
+            owner.m_oldFilterName = owner:GetInternalVariable("m_iName")
             owner:SetName(config.filtername)
         end
 
@@ -142,7 +143,10 @@ function EntWatch.OnWeaponDropped(owner, weapon)
     end
 
     if owner and owner:IsValid() then
-        owner:SetName("player")
+        if isstring(owner.m_oldFilterName) then
+            owner:SetName(owner.m_oldFilterName)
+            owner.m_oldFilterName = nil
+        end
 
         if !owner:Alive() then
             net.Start("entwatch")
@@ -343,16 +347,17 @@ hook.Add("EntityKeyValue", "EntWatch.EntityKeyValue", function(ent, key, value)
     end
 
     if ent:GetClass() == "math_counter" then
-        if key == "startvalue" then
+        local keylow = key:lower()
+        if keylow == "startvalue" then
             ent.m_OutValue = tonumber(value) or 0
             ent.m_InitialValue = ent.m_OutValue
-        elseif key == "min" then
+        elseif keylow == "min" then
             ent.m_flMin = tonumber(value) or 0
-        elseif key == "max" then
+        elseif keylow == "max" then
             ent.m_flMax = tonumber(value) or 0
-        elseif key == "StartDisabled" then
+        elseif keylow == "startdisabled" then
             ent.m_bDisabled = tobool(value) or false
-        elseif key == "hammerid" then
+        elseif keylow == "hammerid" then
             ent:SetHammerID(tonumber(value) or 0)
             EntWatch.OnCounterInit(ent)
         end
@@ -370,14 +375,16 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
         end
     end
 
+    local inputlow = input:lower()
     local parent = ent:GetMateriaParent()
 
     -- checking the "func_button" entity and the parent (weapon) entity
     if ENTWATCH_BUTTON_CLASSNAMES[ent:GetClass()] and parent and parent:IsValid() then
-        if input == "Use" then
+        if inputlow == "use" then
             if !IsValid(activator) or ent:IsPressed() then return end
 
-            local filtername = parent:GetMateriaConfig()["filtername"]
+            local config = parent:GetMateriaConfig() or {}
+            local filtername = config["filtername"]
             if isstring(filtername) and #filtername > 0 and filtername ~= activator:GetInternalVariable("m_iName") then return end
 
             if CurTime() < parent:GetMateriaCooldown() then
@@ -398,11 +405,11 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
             end
 
             EntWatch.OnButtonPressed(ent)
-        elseif input == "Lock" then
+        elseif inputlow == "lock" then
             EntWatch.OnButtonLocked(ent)
-        elseif input == "Unlock" then
+        elseif inputlow == "unlock" then
             EntWatch.OnButtonUnlocked(ent)
-        elseif input == "Kill" then
+        elseif inputlow == "kill" then
             EntWatch.OnButtonKilled(ent)
         --else
             --print("[BUG] AcceptInput: ", ent:GetInternalVariable("m_iHammerID"), ent, activator, caller, input, value)
@@ -414,29 +421,40 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
         local valuenew = tonumber(value) or 0
 
         -- a random shit to get right value from engine
-        if input == "Enable" then
+        if inputlow == "enable" then
             ent.m_bDisabled = false
-        elseif input == "Disable" then
+        elseif inputlow == "disable" then
             ent.m_bDisabled = true
-        elseif input == "Add" then
+        elseif inputlow == "add" then
             ent.m_OutValue = ent.m_OutValue + valuenew
-        elseif input == "Subtract" then
+        elseif inputlow == "subtract" then
             ent.m_OutValue = ent.m_OutValue - valuenew
-        elseif input == "Divide" and valuenew ~= 0 then
+        elseif inputlow == "divide" and valuenew ~= 0 then
             ent.m_OutValue = ent.m_OutValue / valuenew
-        elseif input == "Multiply" then
+        elseif inputlow == "multiply" then
             ent.m_OutValue = ent.m_OutValue * valuenew
-        elseif input == "SetValue" or input == "SetValueNoFire" then
+        elseif inputlow == "setvalue" or input == "setvaluenofire" then
             ent.m_OutValue = valuenew
-        elseif input == "SetHitMax" then
+        elseif inputlow == "sethitmax" then
             ent.m_flMax = valuenew
             if ent.m_flMax < ent.m_flMin then
                 ent.m_flMin = ent.m_flMax
             end
-        elseif input == "SetHitMin" then
+        elseif inputlow == "sethitmin" then
             ent.m_flMin = valuenew
             if ent.m_flMax < ent.m_flMin then
                 ent.m_flMax = ent.m_flMin
+            end
+        elseif inputlow == "addoutput" and value ~= nil then
+            local valuelow = value:lower()
+            if valuelow:match("^startvalue (%d+)") then
+                ent.m_OutValue = tonumber(valuelow:match("^startvalue (%d+)")) or 0
+            elseif valuelow:match("^min (%d+)") then
+                ent.m_flMin = tonumber(valuelow:match("^min (%d+)")) or 0
+            elseif valuelow:match("^max (%d+)") then
+                ent.m_flMax = tonumber(valuelow:match("^max (%d+)")) or 0
+            elseif valuelow:match("^startdisabled (%d+)") then
+                ent.m_bDisabled = tobool(valuelow:match("^startdisabled (%d+)")) or false
             end
         end
 
