@@ -2,7 +2,6 @@ return {
     {
         ["name"] = "Bio Materia",
         ["shortname"] = "Bio",
-        ["filtername"] = "player_bio",
         ["hammerid"] = 2906432,
         ["buttonid"] = 2906364,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -12,7 +11,6 @@ return {
     {
         ["name"] = "Barrier Materia",
         ["shortname"] = "Barrier",
-        ["filtername"] = "player_barrier",
         ["hammerid"] = 2906517,
         ["buttonid"] = 2906449,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -22,7 +20,6 @@ return {
     {
         ["name"] = "Ultima Materia",
         ["shortname"] = "Ultima",
-        ["filtername"] = "player_ultima",
         ["hammerid"] = 2906602,
         ["buttonid"] = 2906534,
         ["mode"] = ENTWATCH_MODE_LIMITED_USES,
@@ -32,7 +29,6 @@ return {
     {
         ["name"] = "Wind Materia",
         ["shortname"] = "Wind",
-        ["filtername"] = "player_wind",
         ["hammerid"] = 2906834,
         ["buttonid"] = 2906766,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -42,7 +38,6 @@ return {
     {
         ["name"] = "Heal Materia",
         ["shortname"] = "Heal",
-        ["filtername"] = "player_heal",
         ["hammerid"] = 2907132,
         ["buttonid"] = 2907064,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -52,7 +47,6 @@ return {
     {
         ["name"] = "Ice Materia",
         ["shortname"] = "Ice",
-        ["filtername"] = "player_ice",
         ["hammerid"] = 2907354,
         ["buttonid"] = 2907286,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -62,7 +56,6 @@ return {
     {
         ["name"] = "Aqua Materia",
         ["shortname"] = "Aqua",
-        ["filtername"] = "player_water",
         ["hammerid"] = 2907705,
         ["buttonid"] = 2907637,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -72,7 +65,6 @@ return {
     {
         ["name"] = "Fire Materia",
         ["shortname"] = "Fire",
-        ["filtername"] = "player_fire",
         ["hammerid"] = 2907860,
         ["buttonid"] = 2907792,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -82,7 +74,6 @@ return {
     {
         ["name"] = "Electro Materia",
         ["shortname"] = "Electro",
-        ["filtername"] = "player_electro",
         ["hammerid"] = 2908013,
         ["buttonid"] = 2907945,
         ["energyname"] = "item_electro_counter",
@@ -94,7 +85,6 @@ return {
     {
         ["name"] = "Earth Materia",
         ["shortname"] = "Earth",
-        ["filtername"] = "player_earth",
         ["hammerid"] = 2908100,
         ["buttonid"] = 2908032,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -104,7 +94,6 @@ return {
     {
         ["name"] = "Gravity Materia",
         ["shortname"] = "Gravity",
-        ["filtername"] = "player_gravity",
         ["hammerid"] = 2908185,
         ["buttonid"] = 2908117,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
@@ -114,7 +103,6 @@ return {
     {
         ["name"] = "Mimic Materia",
         ["shortname"] = "Mimic",
-        ["filtername"] = "player_mimic",
         ["hammerid"] = 4525325,
         ["buttonid"] = 4525251,
         ["mode"] = ENTWATCH_MODE_COOLDOWNS,
