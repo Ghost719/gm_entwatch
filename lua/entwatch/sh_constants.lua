@@ -1,10 +1,17 @@
-ENTWATCH_MODE_NOBUTTON = 0
-ENTWATCH_MODE_SPAM_PROTECTION_ONLY = 1
-ENTWATCH_MODE_COOLDOWNS = 2
-ENTWATCH_MODE_LIMITED_USES = 3
-ENTWATCH_MODE_COUNTER_FMIN_REACHED = 4
-ENTWATCH_MODE_COUNTER_FMAX_REACHED = 5
+--- Shared constants: materia modes and entity class lookup tables.
+-- @module entwatch.sh_constants
 
+-- Materia operating modes. Determined by what is parented to the weapon:
+-- a button, a counter, or nothing at all.
+ENTWATCH_MODE_NOBUTTON = 0              -- no usable button; passive/trigger item
+ENTWATCH_MODE_SPAM_PROTECTION_ONLY = 1  -- button with a minimal anti-spam delay only
+ENTWATCH_MODE_COOLDOWNS = 2             -- button with a real cooldown between uses
+ENTWATCH_MODE_LIMITED_USES = 3          -- button with a limited number of uses
+ENTWATCH_MODE_COUNTER_FMIN_REACHED = 4  -- math_counter based; depleted when it hits min
+ENTWATCH_MODE_COUNTER_FMAX_REACHED = 5  -- math_counter based; depleted when it hits max
+
+--- CS:S weapon classes that can host a materia config.
+-- Used as a fast set: ENTWATCH_CSSWEAPONS[class] == true.
 ENTWATCH_CSSWEAPONS = {
     ["weapon_knife"] = true,
     ["weapon_glock"] = true,
@@ -33,6 +40,7 @@ ENTWATCH_CSSWEAPONS = {
     ["weapon_m249"] = true
 }
 
+--- Entity classes treated as "buttons" that can be parented to a materia.
 ENTWATCH_BUTTON_CLASSNAMES = {
     ["func_button"] = true,
     ["func_rot_button"] = true,

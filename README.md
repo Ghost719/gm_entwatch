@@ -1,46 +1,74 @@
 # EntWatch for Garry's Mod Zombie Escape
-Самописный аддон для отслеживания материй на ZE картах
+A custom addon for tracking special items ("materias") on ZE maps, with item
+admin tools and a boss HP HUD.
 
-## Добавление конфига
-Первые значение можно получить тут [Nide-GG](https://github.com/NiDE-gg/ZE-Configs/tree/master/cstrike/addons/sourcemod/configs/entwatch/maps) или по `"weapon_*"` через Notepad++
+## Adding a map config
+Initial values can be taken from the
+[NiDE-GG configs](https://github.com/NiDE-gg/ZE-Configs/tree/master/cstrike/addons/sourcemod/configs/entwatch/maps)
+or found by searching the map for `"weapon_*"` (e.g. with Notepad++).
 
-Но для `func_button`, `math_counter` и `pt_spawner` прийдется лезть в исходники карты.
+For `func_button`, `math_counter` and `pt_spawner` values you will have to
+inspect the map sources (decompile the BSP or use the bundled `bsp.py`).
 
-По `hammerid` находим нашу материю. Далее по `targetname` находим либо `point_template`, где есть наш `targetname`, либо вручную находим `func_button`, берём оттуда `id` и записываем в конфиг `buttonid`.
+Find your materia by `hammerid`. Then, by `targetname`, locate either the
+`point_template` that contains that targetname, or find the `func_button`
+manually, take its `id` and write it into the config as `buttonid`.
 
-В самой кнопке есть метод `OnPressed`, который вызывает `filter_activator_name` (1-й параметр - это `targetname`, также через поиск ищем). Внутри будет метод `OnPass`, ищем по имени кнопку и смотрим, что с ней происходит.
-- Если там нет метода `Unlock` или есть `Kill`, то это одноразовая материя (`["mode"] = ENTWATCH_MODE_LIMITED_USES`).
-- Если есть `Unlock`, то в 4-й параметре - это КД. Записываем в конфиг `cooldown` (`["mode"] = ENTWATCH_MODE_COOLDOWNS`, если нет `math_counter`).
+The button has an `OnPressed` output that fires a `filter_activator_name`
+(the first parameter is its `targetname`; search for it as well). Inside it
+there is an `OnPass` output; find the button by name and check what happens
+to it:
+- If there is no `Unlock` there, or there is a `Kill`, the materia is single
+  use (`["mode"] = ENTWATCH_MODE_LIMITED_USES`).
+- If there is an `Unlock`, its 4th parameter is the cooldown. Write it into
+  the config as `cooldown` (`["mode"] = ENTWATCH_MODE_COOLDOWNS` when there
+  is no `math_counter`).
 
-И внимательно смотрим, если есть какая-то строчка, где 2-й параметр - это `Add`, `Substract` или `SetValue`, то переходим по нему. Это наш `math_counter` (также может находится и в `point_template`, но не обязательно). Также записываем `id` в конфиг `energyid` или `targetname` в конфиг `energyname`.
-- Если внутри есть `OnHitMin`, то записываем в конфиг `["mode"] = ENTWATCH_MODE_COUNTER_FMIN_REACHED`
-- А если `OnHitMax`, то записываем в конфиг `["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED`.
-- Можно еще подтянуть `startvalue`, `min` и `max` в конфиг, но не обязательно.
-- Если сильно впадлу, то можно записать эти значения в `maxuses` и выставить `["mode"] = ENTWATCH_MODE_LIMITED_USES`
+Also look carefully for any line whose 2nd parameter is `Add`, `Substract`
+or `SetValue` and follow it. That is the `math_counter` (it may also live
+inside a `point_template`, but not necessarily). Write its `id` into the
+config as `energyid`, or its `targetname` as `energyname`.
+- If it contains `OnHitMin`, set `["mode"] = ENTWATCH_MODE_COUNTER_FMIN_REACHED`.
+- If it contains `OnHitMax`, set `["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED`.
+- Optionally copy `startvalue`, `min` and `max` into the config as well.
+- As a shortcut, these values can be written into `maxuses` with
+  `["mode"] = ENTWATCH_MODE_LIMITED_USES` instead.
 
-Остальное написано в файле `template.lua`, что можно еще изменить.
+Everything else that can be configured is described in `template.lua`.
 
-## Как работает (вкратце)
-Во время инициализации карты, используются три hook'а:
+## How it works (briefly)
+During map initialization three hooks are used:
 
 ### InitPostEntityMap
-Используется для очистки закешированных Энтити как на стороне сервера, так и на стороне клиента
+Clears the cached entities on both the server and the client.
 
 ### EntityKeyValue
-Используется для ранней инициализации материи, но в данном hook Энтити еще полностью не инициализирован. Поэтому инициализация происходит, когда мы получаем заветный `hammerid`. Для `weapon_elite` - имя, КД, кол-во использований. Для `func_button` - особо ничего, кроме привязки оружия к кнопке. Для `math_counter` - инициализация переменных для дальнейшей работы.
+Early materia initialization. Entities are not fully initialized inside this
+hook, so initialization is anchored to the `hammerid` keyvalue. For
+`weapon_elite`: name, cooldown, number of uses. For `func_button`: little
+besides linking the weapon to the button. For `math_counter`: initialization
+of the shadowed variables used later.
 
 ### AcceptInput
-Главный hook, где мы получаем все, что нам нужно для отслеживания `func_button` и `math_counter`. Для `func_button` - `Use`, `Lock`, `Unlock` и `Kill`. Здесь мы можем ограничить кол-во использований или увеличить/уменьшить КД, если карта не предусматривает такого (но прийдется повозиться с эффектами). Для `math_counter` - получение правильного значения.
+The main hook, where everything needed to track `func_button` and
+`math_counter` arrives. For `func_button`: `Use`, `Lock`, `Unlock` and
+`Kill`. Here the number of uses can be limited and the cooldown raised or
+lowered even when the map does not provide one (effects take extra work,
+though). For `math_counter`: keeping the correct value.
 
 > [!NOTE]
-> И для полного отслеживание остаётся пара штрихов: подбирание оружия, дроп через команду/бинд, дроп при смерти и изменение имени для игрока (чтобы не могли использовать материю те, кто не владеет ею)
+> A few finishing touches complete the tracking: weapon pickup, dropping via
+> a command/bind, dropping on death, and changing the player's targetname
+> (so that only the holder can use the materia).
 
 ### WeaponEquip
-Игрок подбирает материю. Если на этапе с `EntityKeyValue` материя не была привязана к `func_button` и/или `math_counter`, то привязываем. Изменяем имя для игрока, чтобы он мог использовать материю.
+A player picks the materia up. If the materia was not linked to its
+`func_button` and/or `math_counter` during `EntityKeyValue`, the link is
+made here. The player's name is changed so they can use the materia.
 > [!CAUTION]
-> а нужно ли? можно в "weapon_map_base" добавить метод `KeyValue`
-> а потом вызывать через `ent:TriggerOutput("OnPlayerPickup", ply)`
-> главное не забыть при дропе ресетнуть имя игрока
+> Is this still needed? `weapon_map_base` could implement a `KeyValue`
+> method and fire `ent:TriggerOutput("OnPlayerPickup", ply)` instead.
+> Just remember to reset the player's name on drop.
 ```
 function ENT:KeyValue(k, v)
     -- 99% of all outputs are named 'OnSomethingHappened'.
@@ -51,8 +79,21 @@ end
 ```
 
 ### PlayerDroppedWeapon
-Игрок выбрасывает материю. При жизни или при смерти. Ресетаем имя и оправляем информацию клиенту, что больше не нужно отслеживать эту материю.
+A player drops the materia, alive or on death. The name is reset and the
+client is told to stop tracking this materia.
 
 ### NET MESSAGES
-На стороне сервера, принимает только одну команду, чтобы получить список материй для отслеживание.
-На стороне клиента: очистка списка всех материй, добавление и удаление материи.
+The server accepts a single command: a request for the list of materias to
+track.
+The client side handles: clearing the whole list, adding and removing a
+materia.
+
+## Boss HP HUD
+Boss configs live in `lua/entwatch/bosses/<map>.lua`; see
+`bosses/template.lua` for the three damage tracking methods (`breakable`,
+`counter`, `hpbar`), trigger activation and timeouts.
+
+## Admin commands (ULX)
+`!ew_reloadconfig`, `!ew_spawnitem`, `!ew_transfer` - item management;
+`!ew_ban`, `!ew_unban`, `!ew_unbanid`, `!ew_banlist` - item bans;
+`!ew_lock`, `!ew_unlock`, `!ew_setuses`, `!ew_setcooldown` - live item edits.

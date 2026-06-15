@@ -14,8 +14,10 @@ return {
         ["filtername"] = "portador_electro",
         ["hammerid"] = 1546,
         ["buttonid"] = 1544,
-        ["mode"] = ENTWATCH_MODE_LIMITED_USES,
-        ["maxuses"] = 3,
+        ["energyname"] = "rayo_balas",
+        ["mode"] = ENTWATCH_MODE_COUNTER_FMIN_REACHED,
+        --["currentvalue"] = 1,
+        --["hitmax"] = 3,
         ["cooldown"] = 55,
     },
     {

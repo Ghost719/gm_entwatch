@@ -1,9 +1,19 @@
-if engine.ActiveGamemode() ~= "zombiesurvival" then return end
+--- ULX commands: EntWatch operations.
+-- ew_reloadconfig - reload the materia config of the current map
+-- ew_spawnitem    - spawn a materia at a player via its point_template
+-- ew_transfer     - move a materia from one player to another
+-- Gamemode gate uses the same prefix match as autorun/entwatch.lua.
+-- @module ulx.ze_entwatch
+
+if string.sub(engine.ActiveGamemode(), 1, 14) ~= "zombiesurvival" then return end
 
 local CATEGORY_NAME = "EntWatch"
 
+local spawn_vector_push = Vector(0, 0, 20)
 ulx.entwatch_spawners = {}
 
+-- Collect every pt_spawner name from the map config for command
+-- autocompletion.
 hook.Add("Initialize", "ulx.entwatch_spawners", function()
     if !EntWatch then return end
 
@@ -14,6 +24,7 @@ hook.Add("Initialize", "ulx.entwatch_spawners", function()
     end
 end)
 
+--- Reloads the materia config of the current map and re-scans weapons.
 function ulx.ew_reloadconfig(calling_ply)
     EntWatch.ReloadConfig()
     ulx.fancyLogAdmin(calling_ply, "#A reloaded config for EntWatch")
@@ -22,7 +33,16 @@ local ew_reloadconfig = ulx.command(CATEGORY_NAME, "ulx ew_reloadconfig", ulx.ew
 ew_reloadconfig:defaultAccess( ULib.ACCESS_ADMIN )
 ew_reloadconfig:help("Reload config for current map")
 
+--- Spawns a materia at a player by firing its point_template.
+-- Refuses when the same materia already exists in the world.
+-- @param target_ply Player spawn location
+-- @param name string pt_spawner value from the map config
 function ulx.ew_spawnitem(calling_ply, target_ply, name)
+    if not isstring(name) then
+        ULib.tsayError(calling_ply, "You must specify a \"pt_spawner\" name!", true)
+        return
+    end
+
     local config = EntWatch.GetConfig("pt_spawner", name)
     if !config then
         ULib.tsayError(calling_ply, "Config not found!", true)
@@ -45,9 +65,9 @@ function ulx.ew_spawnitem(calling_ply, target_ply, name)
     local maker = ents.Create("env_entity_maker")
     maker:SetKeyValue("EntityTemplate", name)
     maker:SetKeyValue("spawnflags", "0")
-    maker:SetPos(target_ply:GetPos() + Vector(0, 0, 20)) -- some materias will split in textures because the mappers are scumbags
+    maker:SetPos(target_ply:GetPos() + spawn_vector_push) -- small Z offset: some materias clip into the ground otherwise
     maker:Fire("ForceSpawn")
-    maker:Fire("Kill")
+    maker:Fire("Kill", nil, 0.05)
 
     ulx.fancyLogAdmin(calling_ply, "#A spawned \"#s\" at #T", config.name, target_ply)
 end
@@ -57,6 +77,9 @@ ew_spawnitem:addParam{ type=ULib.cmds.StringArg, hint="pt_spawner", ULib.cmds.op
 ew_spawnitem:defaultAccess( ULib.ACCESS_ADMIN )
 ew_spawnitem:help("Spawn materia at the given player")
 
+--- Moves the materia of one player to another (same team only).
+-- @param target_from Player current holder
+-- @param target_to Player new holder (must not hold a materia already)
 function ulx.ew_transfer(calling_ply, target_from, target_to)
     if target_from == target_to then
         ULib.tsayError(calling_ply, "You listed the same target twice! Please use two different targets.", true)

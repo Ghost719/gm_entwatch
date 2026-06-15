@@ -71,7 +71,7 @@ return {
         ["filtername"] = "grenades1tru",
         ["hammerid"] = 1520691,
         ["buttonid"] = 1520408,
-        -- крч, видимо это баганая залупа вообще или только в gmod, а значит маппер даун
+        -- this entity appears to be broken (possibly only on the GMod port)
         --["mode"] = ENTWATCH_MODE_LIMITED_USES,
         --["maxuses"] = 7,
         --["cooldown"] = 15,
@@ -80,7 +80,7 @@ return {
     },
 
     -- TODO: check ZM materias
-    -- TODO2: ладно, они все сломаны. Скин физический, можно исправить через ShouldCollide
+    -- TODO2: all of these are broken. The skin is physical; could be fixed via ShouldCollide
     {
         ["name"] = "Zombie Spider",
         ["shortname"] = "ZM Spider",
