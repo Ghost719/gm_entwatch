@@ -15,6 +15,7 @@ return {
         ["iteratorname"] = "Special_HealthCount",
 
         ["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        ["killtimer"] = 125,
     },
 
     -- Hard
@@ -53,6 +54,7 @@ return {
         ["iteratorname"] = "Special_HealthCount",
 
         ["mode"] = ENTWATCH_MODE_COUNTER_FMAX_REACHED,
+        ["killtimer"] = 145,
     },
 
     -- Rage

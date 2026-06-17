@@ -43,8 +43,8 @@ function EntWatch.LoadRawBossConfig()
         EntWatch.Bosses = include(path) or {}
     end
 
-    if EntWatch.BossList ~= nil then EntWatch.BossList = {} end
-    if EntWatch.BossStates ~= nil then EntWatch.BossState = {} end
+    if EntWatch.BossList then EntWatch.BossList = {} end
+    if EntWatch.BossStates then EntWatch.BossState = {} end
 end
 
 EntWatch.LoadRawConfig()

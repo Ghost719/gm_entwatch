@@ -5,13 +5,16 @@
 -- themselves a few seconds after the boss dies or stops receiving updates.
 -- @module entwatch.cl_boss
 
-local HIDE_AFTER_DEATH = 4   -- seconds an empty bar stays visible after death
-local HIDE_AFTER_IDLE  = 30  -- seconds without updates before the bar hides
+local HIDE_AFTER_DEATH    = 4    -- seconds an empty bar stays visible after death
+local HIDE_AFTER_IDLE     = 30   -- seconds without updates before the bar hides
+local DPS_SAMPLE_INTERVAL = 0.15 -- how often Think samples HP for the DPS window
+local DPS_WINDOW_SIZE     = 7    -- seconds of history kept for the DPS average
 
 local color_bg     = Color(0, 0, 0, 180)
 local color_hp     = Color(200, 40, 40, 230)
 local color_hp_lag = Color(255, 160, 40, 200) -- "trail" of recently lost HP
 local color_text   = Color(255, 255, 255, 255)
+local color_red    = Color(200, 40, 40, 255)
 local color_frame  = Color(255, 255, 255, 40)
 
 -- ===================== SINGLE BOSS BAR =====================
@@ -20,6 +23,9 @@ local BAR = {}
 
 function BAR:Init()
     self.shown_hp = 0
+    self.m_dps_list = {}
+    self.m_dps_index = 1
+    self.m_dps_nextthink = 0
 end
 
 --- Configures the bar geometry for a boss.
@@ -31,18 +37,21 @@ function BAR:SetupBoss(uid, miniboss)
     self.m_mini = miniboss
 
     local ss = BetterScreenScale()
+    local gap = math.ceil(ss * 2)
     self.Font  = miniboss and "ZSHUDFontSmallest" or "ZSHUDFontSmall"
     self.BarH  = math.ceil(ss * (miniboss and 14 or 20))
-    -- BarW removed: width is fully driven by the container size. The parent's
-    -- PerformLayout decides how wide each row is (full width for a regular
-    -- boss, 60% for a solo miniboss, ~50% for paired minibosses).
 
     surface.SetFont(self.Font)
     local _, name_h = surface.GetTextSize("W")
     self.NameH = name_h
 
-    -- full row height: name + gap + bar
-    self:SetTall(self.NameH + math.ceil(ss * 2) + self.BarH)
+    surface.SetFont("ZSHUDFontSmallest")
+    local _, info_h = surface.GetTextSize("W")
+    self.InfoH = info_h
+    self.m_gap = gap
+
+    -- full row height: name + gap + bar + gap + info (DPS / kill timer)
+    self:SetTall(self.NameH + gap + self.BarH + gap + self.InfoH)
 end
 
 --- Applies a server update.
@@ -50,11 +59,14 @@ end
 -- @param name string boss display name
 -- @param hp number current HP
 -- @param maxhp number maximum HP
-function BAR:UpdateData(name, hp, maxhp)
-    self.m_name  = name
-    self.m_hp    = hp
-    self.m_maxhp = math.max(maxhp, 1)
+-- @param killtimer number boss kill timer
+function BAR:UpdateData(name, hp, maxhp, killtimer)
+    self.m_lasthp      = self.m_hp or hp
+    self.m_name        = name
+    self.m_hp          = hp
+    self.m_maxhp       = math.max(maxhp, 1)
     self.m_last_update = CurTime()
+    self.m_killtimer   = killtimer
 
     if hp <= 0 and not self.m_dead_at then
         self.m_dead_at = CurTime()
@@ -72,6 +84,20 @@ function BAR:Think()
         local parent = self:GetParent()
         self:Remove()
         if IsValid(parent) then parent:InvalidateLayout() end
+        return
+    end
+
+    if self.m_dps_nextthink and self.m_dps_nextthink <= now then
+        local damage = self.m_lasthp ~= nil and (self.m_lasthp - self.m_hp) or 0
+        if damage >= 0 then
+            self.m_dps_list[self.m_dps_index] = damage
+            self.m_dps_index = self.m_dps_index + 1
+            if self.m_dps_index > DPS_WINDOW_SIZE then
+                self.m_dps_index = 1
+            end
+        end
+        self.m_lasthp = self.m_hp
+        self.m_dps_nextthink = CurTime() + DPS_SAMPLE_INTERVAL
     end
 end
 
@@ -90,9 +116,11 @@ function BAR:Paint(w, h)
     local shown_frac = math.Clamp(self.shown_hp / maxhp, 0, 1)
 
     -- the bar fills the container; sizing is the parent panel's job
+    local gap = self.m_gap or 2
+    local info_h = self.InfoH or 0
     local bw = w
     local bx = 0
-    local by = h - self.BarH
+    local by = h - info_h - gap - self.BarH
 
     draw.SimpleText(self.m_name or "Boss", self.Font, w * 0.5, by - 2, color_text,
         TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
@@ -114,6 +142,29 @@ function BAR:Paint(w, h)
     draw.SimpleText(string.format("%d / %d", math.max(hp, 0), maxhp),
         "ZSHUDFontSmallest", w * 0.5, by + self.BarH * 0.5, color_text,
         TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+    -- Info row below the bar: DPS on the left, kill timer on the right.
+    -- Both are hidden once the boss is dead (hp <= 0).
+    if hp > 0 then
+        local info_y = by + self.BarH + gap
+        local dps = 0
+        for _, i in ipairs(self.m_dps_list) do
+            dps = dps + i
+        end
+
+        draw.SimpleText(string.format("DPS: %.0f", dps),
+            "ZSHUDFontSmallest", 2, info_y, color_text,
+            TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+
+        if self.m_killtimer and self.m_killtimer > 0 then
+            local remaining = math.max(self.m_killtimer - CurTime(), 0)
+            local mins = math.floor(remaining / 60)
+            local secs = math.floor(remaining % 60)
+            draw.SimpleText(string.format("%d:%02d", mins, secs),
+                "ZSHUDFontSmallest", w - 2, info_y, mins == 0 and secs == 0 and color_red or color_text,
+                TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+        end
+    end
 
     return true
 end
@@ -138,7 +189,7 @@ end
 -- @param hp number current HP
 -- @param maxhp number maximum HP
 -- @param miniboss boolean miniboss flag
-function PANEL:UpdateBoss(uid, name, hp, maxhp, miniboss)
+function PANEL:UpdateBoss(uid, name, hp, maxhp, miniboss, killtimer)
     local bar = self:GetBar(uid)
     if not bar then
         bar = vgui.Create("DEntWatchBossBar", self)
@@ -146,7 +197,7 @@ function PANEL:UpdateBoss(uid, name, hp, maxhp, miniboss)
         bar.shown_hp = hp
         self:InvalidateLayout()
     end
-    bar:UpdateData(name, hp, maxhp)
+    bar:UpdateData(name, hp, maxhp, killtimer)
 end
 
 --- Removes the bar for a boss uid, if present.
@@ -234,12 +285,13 @@ net.Receive("entwatch_boss", function()
 
     local uid = net.ReadUInt(8)
     if cmd == 1 then
-        local name     = net.ReadString()
-        local hp       = net.ReadFloat()
-        local maxhp    = net.ReadFloat()
-        local miniboss = net.ReadBool()
+        local name      = net.ReadString()
+        local hp        = net.ReadFloat()
+        local maxhp     = net.ReadFloat()
+        local miniboss  = net.ReadBool()
+        local killtimer = net.ReadFloat()
 
-        EntWatch.BossPanel:UpdateBoss(uid, name, hp, maxhp, miniboss)
+        EntWatch.BossPanel:UpdateBoss(uid, name, hp, maxhp, miniboss, killtimer)
     elseif cmd == 2 then
         EntWatch.BossPanel:RemoveBoss(uid)
         return

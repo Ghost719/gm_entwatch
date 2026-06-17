@@ -13,6 +13,8 @@ return {
 
         ["iteratorid"] = 2474992,
         ["iteratorname"] = "HPCounterIterator",
+
+        ["killtimer"] = 120,
     },
 
     -- Normal, Hard: Bahamut
@@ -29,6 +31,8 @@ return {
 
         ["iteratorid"] = 2474992,
         ["iteratorname"] = "HPCounterIterator",
+
+        ["killtimer"] = 105, -- FIXME: Normal = 105, Hard = 125
     },
 
     -- Normal

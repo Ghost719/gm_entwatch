@@ -204,8 +204,8 @@ function EntWatch.OnWeaponPickup(owner, weapon)
         -- allows you to use a materia after another player has used and dropped the materia:
         -- map filters target players by name, so the holder temporarily takes
         -- the config filtername; the original name is restored on drop
-        owner.m_oldFilterName = owner:GetInternalVariable("m_iName")
         if isstring(config.filtername) then
+            owner.m_oldFilterName = owner:GetInternalVariable("m_iName")
             owner:SetName(config.filtername)
         end
 
@@ -235,7 +235,7 @@ function EntWatch.OnWeaponDropped(owner, weapon)
 
     if owner and owner:IsValid() then
         if isstring(owner.m_oldFilterName) then
-            owner:SetSaveValue("m_iName", owner.m_oldFilterName)
+            owner:SetName(owner.m_oldFilterName)
             owner.m_oldFilterName = nil
         end
 
@@ -559,11 +559,11 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
                     -- bypass the locked state after cooldown:
                     -- unlock the button and replay the original Use input
                     ent:Fire("Unlock")
-                    ent:Fire(input, value, 0.05, activator, caller)
+                    ent:Fire(input, value, 0.1, activator, caller)
                     return true
                 elseif usesleft <= 0 and !ent:IsLocked() then
                     -- limit usage when the maxuses is reached
-                    ent:Fire("Lock")
+                    ent:Fire("Lock", nil, 0.1)
                     return true
                 end
             end
@@ -632,10 +632,12 @@ hook.Add("AcceptInput", "EntWatch.AcceptInput", function(ent, input, activator, 
         end
 
         -- clamp to the engine behaviour: math_counter never leaves [min, max]
-        if ent.m_OutValue < ent.m_flMin then
-            ent.m_OutValue = ent.m_flMin
-        elseif ent.m_OutValue > ent.m_flMax then
-            ent.m_OutValue = ent.m_flMax
+        if ent.m_flMin != 0 or ent.m_flMax != 0 then
+            if ent.m_OutValue < ent.m_flMin then
+                ent.m_OutValue = ent.m_flMin
+            elseif ent.m_OutValue > ent.m_flMax then
+                ent.m_OutValue = ent.m_flMax
+            end
         end
 
         if parent and parent:IsValid() then

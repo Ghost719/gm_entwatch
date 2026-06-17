@@ -172,23 +172,26 @@ function EntWatch.CalcBossHP(state)
         return hp, state.maxhp
     elseif cfg.method == "hpbar" then
         local hpcounter = state.counter
-        if not IsValid(hpcounter) then return 0, state.maxhp or 1 end
+        local hpbackup = state.backup
+        local hpiterator = state.iterator
+        if not IsValid(hpcounter) or not IsValid(hpbackup) or not IsValid(hpiterator) then return 0, state.maxhp or 1 end
 
         -- Segment size: explicit cfg.basehp, else the backup counter's
         -- mirrored value, else the main counter's engine max.
-        local basehp = cfg.basehp or (IsValid(state.backup) and state.backup.m_OutValue) or 0
-        if basehp <= 0 then basehp = hpcounter.m_flMax or 1 end
+        local basehp = cfg.basehp or hpbackup.m_OutValue or 0
+        local backupmin = hpbackup.m_flMin or 0
+        local backupmax = hpbackup.m_flMax or 0
 
-        local currhp = hpcounter.m_OutValue or 0
-        local hpiter, itermax = 1, 40
-        if IsValid(state.iterator) and state.iterator.m_OutValue ~= nil and state.iterator.m_flMax ~= nil then
-            hpiter, itermax = state.iterator.m_OutValue, state.iterator.m_flMax
-        end
+        if (backupmin != 0 or backupmax != 0) and basehp <= 0 then basehp = hpcounter.m_flMax or 1 end
+
+        local current_hp = hpcounter.m_OutValue or 0
+        local segment_num = hpiterator.m_OutValue or 0
+        local segment_max = hpiterator.m_flMax or 40
 
         if cfg.mode == ENTWATCH_MODE_COUNTER_FMAX_REACHED then
             -- FMAX mode: counter has already reached its max, so report 0
-            if itermax <= hpiter then return 0, state.maxhp or 1 end
-        elseif hpiter <= 0 then
+            if segment_max <= segment_num then return 0, state.maxhp or 1 end
+        elseif segment_num <= 0 then
             -- FMIN mode (default): counter has reached its min
             return 0, state.maxhp or 1
         end
@@ -197,14 +200,14 @@ function EntWatch.CalcBossHP(state)
         if cfg.mode == ENTWATCH_MODE_COUNTER_FMAX_REACHED then
             -- FMAX mode: the counter counts damage up towards its max, so the
             -- remaining HP is the distance to the max.
-            segments_left = math.max(1, itermax - hpiter) - 1
+            segments_left = math.max(1, segment_max - segment_num) - 1
         else
             -- FMIN mode (default): the counter value is the HP itself.
-            segments_left = math.max(0, hpiter - 1)
+            segments_left = math.max(0, segment_num - 1)
         end
 
         -- Continuous across a segment break: (N-1)*B + 0 == (N-2)*B + B.
-        local hp = segments_left * basehp + currhp
+        local hp = segments_left * basehp + current_hp
         if not state.maxhp then
             state.maxhp = math.max(segments_left * basehp, basehp, 1)
         end
@@ -262,6 +265,12 @@ function EntWatch.SendBossState(state, target)
         if state.peak_hp and state.peak_hp > maxhp then maxhp = state.peak_hp end
     end
 
+    -- Kill timer absolute end time (CurTime-based). 0 = no timer configured
+    local killtimer_end = 0
+    if state.killtimer_started and isnumber(cfg.killtimer) and cfg.killtimer > 0 then
+        killtimer_end = state.killtimer_started + cfg.killtimer
+    end
+
     EntWatch.BossLog("send: uid=%d '%s' hp=%.0f/%.0f", state.uid, state.config.name or "?", hp, maxhp)
     net.Start("entwatch_boss")
     net.WriteUInt(1, 4) -- update
@@ -270,6 +279,7 @@ function EntWatch.SendBossState(state, target)
     net.WriteFloat(math.max(hp, 0))
     net.WriteFloat(math.max(maxhp, 1))
     net.WriteBool(state.config.miniboss == true)
+    net.WriteFloat(killtimer_end)
     if target then net.Send(target) else net.Broadcast() end
 end
 
@@ -363,6 +373,16 @@ hook.Add("EntityKeyValue", "EntWatch.BossKeyValue", function(ent, key, value)
         local id = tonumber(value) or 0
         ent:SetHammerID(id) -- ordering with the core hook is not guaranteed, so duplicate it
         EntWatch.TryBind(ent, id)
+
+        -- A trigger entity (relay/trigger brush) just spawned: install the
+        -- output hook. timer.Simple(0) because AddOutput on an entity that is
+        -- still being constructed is unreliable.
+        local shammerid = "#" .. value
+        if trigger_output[shammerid] then
+            timer.Simple(0, function()
+                if IsValid(ent) then EntWatch.HookEntityOutputs(ent, value) end
+            end)
+        end
     elseif keylow == "targetname" then
         EntWatch.TryBind(ent, value)
 
@@ -392,6 +412,9 @@ function EntWatch.ActivateBoss(cfg)
     state.triggered = true
     state.last_trigger = CurTime()
     state.dirty = true
+    if not state.killtimer_started and isnumber(cfg.killtimer) and cfg.killtimer > 0 then
+        state.killtimer_started = CurTime()
+    end
 end
 
 --- Mark a boss as dead and push a final hp=0 update.
@@ -421,6 +444,7 @@ function EntWatch.KillBoss(cfg)
     net.WriteFloat(0)
     net.WriteFloat(maxhp)
     net.WriteBool(cfg.miniboss == true)
+    net.WriteFloat(0)
     net.Broadcast()
 end
 
@@ -642,7 +666,8 @@ local function SoftResetState(state)
     state.next_send    = 0
     state.last_trigger = nil
     state.peak_hp      = nil
-    state.maxhp        = (cfg.maxhp and cfg.maxhp > 0) and cfg.maxhp or nil
+    state.killtimer_started = nil
+    state.maxhp        = nil -- (cfg.maxhp and cfg.maxhp > 0) and cfg.maxhp or nil
     state.dead         = false
 end
 
